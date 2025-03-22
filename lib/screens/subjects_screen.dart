@@ -41,18 +41,19 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
+      body: Padding(
+        padding: const EdgeInsets.only(top: 30),
         child: Column(
           children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              color: const Color(0xFF2962FF),
+              color: AppTheme.primaryColor,
               child: Column(
                 children: [
                   const Text(
@@ -170,67 +171,65 @@ class SubjectDetailsScreen extends StatelessWidget {
         backgroundColor: AppTheme.primaryColor,
         title: Text(subject['name'] as String),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: AppTheme.surfaceColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Course Code: ${subject['code']}',
+                  style: const TextStyle(
+                    color: AppTheme.onBackgroundColor,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Assessment Components',
+                  style: TextStyle(
+                    color: AppTheme.onBackgroundColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              color: AppTheme.surfaceColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Course Code: ${subject['code']}',
-                    style: const TextStyle(
-                      color: AppTheme.onBackgroundColor,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Assessment Components',
-                    style: TextStyle(
-                      color: AppTheme.onBackgroundColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: components.length,
-                itemBuilder: (context, index) {
-                  final component = components[index];
-                  return Card(
-                    color: AppTheme.surfaceColor,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      title: Text(
-                        component['name'] as String,
-                        style: const TextStyle(
-                          color: AppTheme.onBackgroundColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+              itemCount: components.length,
+              itemBuilder: (context, index) {
+                final component = components[index];
+                return Card(
+                  color: AppTheme.surfaceColor,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    title: Text(
+                      component['name'] as String,
+                      style: const TextStyle(
+                        color: AppTheme.onBackgroundColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                      subtitle: Text(
-                        'Marks: ${component['marks']}',
-                        style: TextStyle(color: AppTheme.onBackgroundColor),
-                      ),
-                      trailing:
-                          Icon(Icons.arrow_forward_ios, color: AppTheme.onBackgroundColor),
                     ),
-                  );
-                },
-              ),
+                    subtitle: Text(
+                      'Marks: ${component['marks']}',
+                      style: TextStyle(color: AppTheme.onBackgroundColor),
+                    ),
+                    trailing:
+                        Icon(Icons.arrow_forward_ios, color: AppTheme.onBackgroundColor),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

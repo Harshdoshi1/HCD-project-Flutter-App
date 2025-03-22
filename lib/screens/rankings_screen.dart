@@ -41,6 +41,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
         Container(
           width: double.infinity,
           color: AppTheme.primaryColor,
+          padding: const EdgeInsets.only(
+            top: kToolbarHeight + -20, // kToolbarHeight adds space for the system bar
+            left: 20,
+            right: 20,
+            bottom: 20,
+          ),
           child: Column(
             children: [
               const Padding(
@@ -66,6 +72,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             ],
           ),
         ),
+        const SizedBox(height: 20), // Push rankings down
         Expanded(
           child: TabBarView(
             controller: _tabController,
