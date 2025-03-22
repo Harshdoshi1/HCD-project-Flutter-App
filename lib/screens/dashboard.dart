@@ -51,11 +51,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    // Using SystemChrome is optional – you can adjust based on your needs.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: colorScheme.background,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -67,7 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 right: 20,
                 bottom: 20,
               ),
-              color: Colors.blue[900],
+              color: colorScheme.primary,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -105,7 +108,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 opacity: _fadeAnimation,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(30),
                       topRight: Radius.circular(30),

@@ -45,7 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Theme.of(context).brightness == Brightness.dark ? Brightness.light : Brightness.dark,
     ));
 
     final theme = Theme.of(context).colorScheme;
@@ -71,31 +71,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       ),
       body: FadeTransition(
         opacity: _fadeInAnimation,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: ListView(
-            children: [
-              _buildProfileHeader(theme),
-              const SizedBox(height: 16),
-              _buildAnimatedInfoCard('Personal Information', [
-                _buildInfoRow('Email', 'harshdoshi@university.com'),
-                _buildInfoRow('Phone', '+91 9876543210'),
-                _buildInfoRow('Batch', '2021-2025'),
-              ], theme),
-              _buildAnimatedInfoCard('Academic Information', [
-                _buildInfoRow('Department', 'Information & Communication Technology'),
-                _buildInfoRow('Semester', '5th'),
-                _buildInfoRow('CGPA', '3.8'),
-                _buildInfoRow('Rank', 'Top 10%'),
-                _buildInfoRow('Attendance', '85%'),
-              ], theme),
-              _buildAnimatedInfoCard('Additional Information', [
-                _buildInfoRow('Skills', 'Flutter, Dart, Firebase, UI/UX Design'),
-                _buildInfoRow('Certifications', 'Google Flutter Certification'),
-                _buildInfoRow('Projects', 'Hostel Management App, Resume Builder'),
-                _buildInfoRow('Internships', 'Software Developer Intern at XYZ Tech'),
-              ], theme),
-            ],
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                _buildProfileHeader(theme),
+                const SizedBox(height: 16),
+                _buildAnimatedInfoCard('Personal Information', [
+                  _buildInfoRow('Email', 'harshdoshi@university.com'),
+                  _buildInfoRow('Phone', '+91 9876543210'),
+                  _buildInfoRow('Batch', '2021-2025'),
+                ], theme),
+                _buildAnimatedInfoCard('Academic Information', [
+                  _buildInfoRow('Department', 'Information & Communication Technology'),
+                  _buildInfoRow('Semester', '5th'),
+                  _buildInfoRow('CGPA', '3.8'),
+                  _buildInfoRow('Rank', 'Top 10%'),
+                  _buildInfoRow('Attendance', '85%'),
+                ], theme),
+                _buildAnimatedInfoCard('Additional Information', [
+                  _buildInfoRow('Skills', 'Flutter, Dart, Firebase, UI/UX Design'),
+                  _buildInfoRow('Certifications', 'Google Flutter Certification'),
+                  _buildInfoRow('Projects', 'Hostel Management App, Resume Builder'),
+                  _buildInfoRow('Internships', 'Software Developer Intern at XYZ Tech'),
+                ], theme),
+              ],
+            ),
           ),
         ),
       ),
@@ -104,6 +107,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Widget _buildProfileHeader(ColorScheme theme) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         CircleAvatar(
           radius: 50,

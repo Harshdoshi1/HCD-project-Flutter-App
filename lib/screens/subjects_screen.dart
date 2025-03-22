@@ -15,7 +15,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  static const semesters = [
+  static const List<Map<String, dynamic>> semesters = [
     {
       'name': 'Semester 1',
       'subjects': [
@@ -67,10 +67,11 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: colorScheme.background,
       body: Column(
         children: [
           Container(
@@ -81,17 +82,17 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               left: 16,
               right: 16,
             ),
-            color: AppTheme.primaryColor,
+            color: AppTheme.primaryColor, // Adjusted
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center, // Ensure the content is centered
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 FadeTransition(
                   opacity: _fadeAnimation,
-                  child: Center( // Centering the text
+                  child: Center(
                     child: Text(
                       'My Subjects',
                       style: TextStyle(
-                        color: AppTheme.onPrimaryColor,
+                        color: AppTheme.onPrimaryColor, // Adjusted
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -105,7 +106,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(8, (index) {
+                      children: List.generate(semesters.length, (index) {
                         final semester = index + 1;
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -148,17 +149,16 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                       ? (semesters[_selectedSemester - 1]['subjects'] as List).length
                       : 0,
                   itemBuilder: (context, index) {
-                    final subjects = _selectedSemester <= semesters.length
-                        ? (semesters[_selectedSemester - 1]['subjects'] as List)
-                        : [];
-                    final subject = subjects[index];
+                    if (_selectedSemester > semesters.length) return const SizedBox();
+                    final subjects = semesters[_selectedSemester - 1]['subjects'] as List;
+                    final subject = subjects[index] as Map<String, dynamic>;
                     return Card(
                       color: AppTheme.surfaceColor,
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         contentPadding: const EdgeInsets.all(16),
                         title: Text(
-                          subject['name'] as String,
+                          subject['name'],
                           style: const TextStyle(
                             color: AppTheme.onBackgroundColor,
                             fontSize: 18,
@@ -167,9 +167,9 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                         ),
                         subtitle: Text(
                           'Code: ${subject['code']}',
-                          style: TextStyle(color: AppTheme.onBackgroundColor),
+                          style: const TextStyle(color: AppTheme.onBackgroundColor),
                         ),
-                        trailing: Icon(
+                        trailing: const Icon(
                           Icons.arrow_forward_ios,
                           color: AppTheme.onBackgroundColor,
                         ),

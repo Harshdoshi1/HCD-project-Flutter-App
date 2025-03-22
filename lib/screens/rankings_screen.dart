@@ -10,10 +10,9 @@ class RankingsScreen extends StatefulWidget {
 
 class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStateMixin {
   late TabController _tabController;
+  late PageController _pageController;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  late AnimationController _slideController;
-  late Animation<Offset> _slideAnimation;
 
   final List<String> studentNames = [
     'Harsh Doshi',
@@ -31,206 +30,174 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _pageController = PageController();
 
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 500),
     );
 
-    _slideController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
-    );
-
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-      CurvedAnimation(parent: _slideController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
 
     _fadeController.forward();
-    _slideController.forward();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _pageController.dispose();
     _fadeController.dispose();
-    _slideController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  _tabController.animateTo(index);
+                },
+                children: [
+                  _buildAcademicRankings(),
+                  _buildNonAcademicRankings(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(
+        top: kToolbarHeight - 10,
+        left: 20,
+        right: 20,
+        bottom: 16,
+      ),
+      color: AppTheme.primaryColor, // Fixed theme reference
+      child: Column(
+        children: [
+          const Text(
+            'Rankings',
+            style: TextStyle(
+              color: AppTheme.onPrimaryColor,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TabBar(
+            controller: _tabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicator: const UnderlineTabIndicator(
+              borderSide: BorderSide(width: 4, color: Colors.white),
+              insets: EdgeInsets.symmetric(horizontal: 16),
+            ),
+            onTap: (index) {
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            tabs: const [
+              Tab(text: 'Academic'),
+              Tab(text: 'Non-Academic'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicRankings() {
+    return _buildRankingsList(
+      title: 'Academic Rankings',
+      itemBuilder: (context, index) {
+        return _buildRankingCard(
+          rank: index + 1,
+          name: studentNames[index],
+          subtitle: 'SGPA: ${(9.5 - index * 0.2).toStringAsFixed(2)}',
+        );
+      },
+    );
+  }
+
+  Widget _buildNonAcademicRankings() {
+    final activities = ['Sports', 'Cultural', 'Technical', 'Social Service', 'Innovation'];
+    return _buildRankingsList(
+      title: 'Non-Academic Rankings',
+      itemBuilder: (context, index) {
+        return _buildRankingCard(
+          rank: index + 1,
+          name: studentNames[index],
+          subtitle: 'Top Activity: ${activities[index % activities.length]}',
+        );
+      },
+    );
+  }
+
+  Widget _buildRankingsList({
+    required String title,
+    required IndexedWidgetBuilder itemBuilder,
+  }) {
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          color: AppTheme.primaryColor,
-          padding: const EdgeInsets.only(
-            top: kToolbarHeight - 20,
-            left: 20,
-            right: 20,
-            bottom: 20,
-          ),
-          child: Column(
-            children: [
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Rankings',
-                    style: TextStyle(
-                      color: AppTheme.onPrimaryColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              SlideTransition(
-                position: _slideAnimation,
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: AppTheme.onPrimaryColor,
-                  unselectedLabelColor: Colors.white70,
-                  tabs: const [
-                    Tab(text: 'Academic'),
-                    Tab(text: 'Non-Academic'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildAcademicRankings(),
-              _buildNonAcademicRankings(),
-            ],
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: studentNames.length,
+            itemBuilder: itemBuilder,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildAcademicRankings() {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: studentNames.length,
-          itemBuilder: (context, index) {
-            return Card(
-              color: AppTheme.surfaceColor,
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: CircleAvatar(
-                  backgroundColor: index < 3 ? AppTheme.secondaryColor : Colors.grey[700],
-                  child: Text(
-                    '${index + 1}',
-                    style: const TextStyle(
-                      color: AppTheme.onPrimaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  studentNames[index],
-                  style: const TextStyle(
-                    color: AppTheme.onBackgroundColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text(
-                      'SGPA: ${(9.5 - index * 0.2).toStringAsFixed(2)}',
-                      style: TextStyle(color: AppTheme.onBackgroundColor),
-                    ),
-                    Text(
-                      'Department: Computer Science',
-                      style: TextStyle(color: AppTheme.onBackgroundColor),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+  Widget _buildRankingCard({required int rank, required String name, required String subtitle}) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Theme.of(context).cardColor,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: rank <= 3 ? AppTheme.secondaryColor : Colors.grey[700],
+          child: Text(
+            '$rank',
+            style: const TextStyle(
+              color: AppTheme.onPrimaryColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildNonAcademicRankings() {
-    final activities = [
-      {'name': 'Sports', 'points': 150},
-      {'name': 'Cultural', 'points': 120},
-      {'name': 'Technical', 'points': 100},
-      {'name': 'Social Service', 'points': 90},
-      {'name': 'Innovation', 'points': 85},
-    ];
-
-    return SlideTransition(
-      position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: studentNames.length,
-          itemBuilder: (context, index) {
-            return Card(
-              color: AppTheme.surfaceColor,
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: CircleAvatar(
-                  backgroundColor: index < 3 ? AppTheme.secondaryColor : Colors.grey[700],
-                  child: Text(
-                    '${index + 1}',
-                    style: const TextStyle(
-                      color: AppTheme.onPrimaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  studentNames[index],
-                  style: const TextStyle(
-                    color: AppTheme.onBackgroundColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text(
-                      'Activity Points: ${300 - index * 25}',
-                      style: TextStyle(color: AppTheme.onBackgroundColor),
-                    ),
-                    Text(
-                      'Top Activity: ${activities[index % activities.length]['name']}',
-                      style: TextStyle(color: AppTheme.onBackgroundColor),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        title: Text(
+          name,
+          style: const TextStyle(
+            color: AppTheme.onBackgroundColor,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: AppTheme.onBackgroundColor),
         ),
       ),
     );
