@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../constants/app_theme.dart';
 
 class SubjectsScreen extends StatefulWidget {
@@ -10,7 +11,7 @@ class SubjectsScreen extends StatefulWidget {
 
 class _SubjectsScreenState extends State<SubjectsScreen> {
   int _selectedSemester = 1;
-  
+
   static const semesters = [
     {
       'name': 'Semester 1',
@@ -40,7 +41,10 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Column(
@@ -48,7 +52,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              color: AppTheme.primaryColor,
+              color: const Color(0xFF2962FF),
               child: Column(
                 children: [
                   const Text(
@@ -71,9 +75,9 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
                             label: Text(
                               'Sem $semester',
                               style: TextStyle(
-                                color: _selectedSemester == semester 
-                                  ? AppTheme.onPrimaryColor 
-                                  : AppTheme.onBackgroundColor,
+                                color: _selectedSemester == semester
+                                    ? AppTheme.onPrimaryColor
+                                    : AppTheme.onBackgroundColor,
                               ),
                             ),
                             selected: _selectedSemester == semester,
@@ -97,13 +101,13 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: (_selectedSemester <= semesters.length) 
-                  ? (semesters[_selectedSemester - 1]['subjects'] as List).length 
-                  : 0,
+                itemCount: (_selectedSemester <= semesters.length)
+                    ? (semesters[_selectedSemester - 1]['subjects'] as List).length
+                    : 0,
                 itemBuilder: (context, index) {
                   final subjects = _selectedSemester <= semesters.length
-                    ? (semesters[_selectedSemester - 1]['subjects'] as List)
-                    : [];
+                      ? (semesters[_selectedSemester - 1]['subjects'] as List)
+                      : [];
                   final subject = subjects[index];
                   return Card(
                     color: AppTheme.surfaceColor,
@@ -122,12 +126,14 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
                         'Code: ${subject['code']}',
                         style: TextStyle(color: AppTheme.onBackgroundColor),
                       ),
-                      trailing: Icon(Icons.arrow_forward_ios, color: AppTheme.onBackgroundColor),
+                      trailing:
+                          Icon(Icons.arrow_forward_ios, color: AppTheme.onBackgroundColor),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => SubjectDetailsScreen(subject: subject),
+                            builder: (context) =>
+                                SubjectDetailsScreen(subject: subject),
                           ),
                         );
                       },
@@ -216,7 +222,8 @@ class SubjectDetailsScreen extends StatelessWidget {
                         'Marks: ${component['marks']}',
                         style: TextStyle(color: AppTheme.onBackgroundColor),
                       ),
-                      trailing: Icon(Icons.arrow_forward_ios, color: AppTheme.onBackgroundColor),
+                      trailing:
+                          Icon(Icons.arrow_forward_ios, color: AppTheme.onBackgroundColor),
                     ),
                   );
                 },
