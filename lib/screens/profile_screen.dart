@@ -10,13 +10,44 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeInAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward(); // Ensure the animation starts
+
+    _fadeInAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeIn,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark, // Light theme optimization
+      statusBarIconBrightness: Brightness.dark,
     ));
 
     final theme = Theme.of(context).colorScheme;
@@ -40,31 +71,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            _buildProfileHeader(theme),
-            const SizedBox(height: 16),
-            _buildInfoCard('Personal Information', [
-              _buildInfoRow('Email', 'harshdoshi@university.com'),
-              _buildInfoRow('Phone', '+91 9876543210'),
-              _buildInfoRow('Batch', '2021-2025'),
-            ], theme),
-            _buildInfoCard('Academic Information', [
-              _buildInfoRow('Department', 'Information & Communication Technology'),
-              _buildInfoRow('Semester', '5th'),
-              _buildInfoRow('CGPA', '3.8'),
-              _buildInfoRow('Rank', 'Top 10%'),
-              _buildInfoRow('Attendance', '85%'),
-            ], theme),
-            _buildInfoCard('Additional Information', [
-              _buildInfoRow('Skills', 'Flutter, Dart, Firebase, UI/UX Design'),
-              _buildInfoRow('Certifications', 'Google Flutter Certification'),
-              _buildInfoRow('Projects', 'Hostel Management App, Resume Builder'),
-              _buildInfoRow('Internships', 'Software Developer Intern at XYZ Tech'),
-            ], theme),
-          ],
+      body: FadeTransition(
+        opacity: _fadeInAnimation,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: ListView(
+            children: [
+              _buildProfileHeader(theme),
+              const SizedBox(height: 16),
+              _buildAnimatedInfoCard('Personal Information', [
+                _buildInfoRow('Email', 'harshdoshi@university.com'),
+                _buildInfoRow('Phone', '+91 9876543210'),
+                _buildInfoRow('Batch', '2021-2025'),
+              ], theme),
+              _buildAnimatedInfoCard('Academic Information', [
+                _buildInfoRow('Department', 'Information & Communication Technology'),
+                _buildInfoRow('Semester', '5th'),
+                _buildInfoRow('CGPA', '3.8'),
+                _buildInfoRow('Rank', 'Top 10%'),
+                _buildInfoRow('Attendance', '85%'),
+              ], theme),
+              _buildAnimatedInfoCard('Additional Information', [
+                _buildInfoRow('Skills', 'Flutter, Dart, Firebase, UI/UX Design'),
+                _buildInfoRow('Certifications', 'Google Flutter Certification'),
+                _buildInfoRow('Projects', 'Hostel Management App, Resume Builder'),
+                _buildInfoRow('Internships', 'Software Developer Intern at XYZ Tech'),
+              ], theme),
+            ],
+          ),
         ),
       ),
     );
@@ -98,29 +132,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoCard(String title, List<Widget> children, ColorScheme theme) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: theme.primary,
+  Widget _buildAnimatedInfoCard(String title, List<Widget> children, ColorScheme theme) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: Card(
+        elevation: 3,
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.primary,
+                ),
               ),
-            ),
-            const Divider(),
-            ...children,
-          ],
+              const Divider(),
+              ...children,
+            ],
+          ),
         ),
       ),
     );

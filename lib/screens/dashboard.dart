@@ -3,213 +3,131 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_theme.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
   @override
+  _DashboardScreenState createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeTextAnimation;
+  late Animation<Offset> _slideTextAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _fadeTextAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+    _slideTextAnimation = Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Enable edge-to-edge display
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     return Scaffold(
-      // This makes the body extend behind the app bar and status bar.
       extendBodyBehindAppBar: true,
       backgroundColor: AppTheme.backgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Blue Header Section
             Container(
               width: double.infinity,
-              // Provide some top padding to avoid overlapping essential header content,
-              // adjust padding as needed.
               padding: const EdgeInsets.only(
-                top: kToolbarHeight + 20, // kToolbarHeight adds space for the system bar
+                top: kToolbarHeight + 20,
                 left: 20,
                 right: 20,
                 bottom: 20,
               ),
               color: Colors.blue[900],
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'ICT 6th Semester',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+                  SlideTransition(
+                    position: _slideTextAnimation,
+                    child: FadeTransition(
+                      opacity: _fadeTextAnimation,
+                      child: const Text(
+                        'Welcome, Harsh Doshi',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 15),
-                  GridView.count(
-                    shrinkWrap: true,
-                    crossAxisCount: 2,
-                    childAspectRatio: 3,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _buildStatItem('Statistics', '4.14'),
-                      _buildStatItem('Lithouse', 'Geography'),
-                      _buildStatItem('Hitney', 'Algerico'),
-                      _buildStatItem('Due', '69%'),
-                      _buildStatItem('Right', '85%'),
-                      _buildStatItem('Wrong', '15%'),
-                      _buildStatItem('28Jun', '13'),
-                      _buildStatItem('Tesika learned', 'Classes 8'),
-                    ],
+                  SlideTransition(
+                    position: _slideTextAnimation,
+                    child: FadeTransition(
+                      opacity: _fadeTextAnimation,
+                      child: const CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.white,
+                        child: Icon(Icons.person, color: Colors.blue),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            // White Charts Section
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            SlideTransition(
+              position: _slideAnimation,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _buildChartCard(
-                      title: 'SGPA Progression',
-                      height: 250,
-                      chart: BarChart(
-                        BarChartData(
-                          alignment: BarChartAlignment.spaceAround,
-                          maxY: 10,
-                          barGroups: [
-                            BarChartGroupData(x: 0, barRods: [
-                              BarChartRodData(
-                                toY: 8.2,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 1, barRods: [
-                              BarChartRodData(
-                                toY: 8.5,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 2, barRods: [
-                              BarChartRodData(
-                                toY: 7.8,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 3, barRods: [
-                              BarChartRodData(
-                                toY: 8.9,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 4, barRods: [
-                              BarChartRodData(
-                                toY: 8.3,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 5, barRods: [
-                              BarChartRodData(
-                                toY: 9.1,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 6, barRods: [
-                              BarChartRodData(
-                                toY: 8.7,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                            BarChartGroupData(x: 7, barRods: [
-                              BarChartRodData(
-                                toY: 9.0,
-                                color: Colors.blue,
-                                width: 10,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ]),
-                          ],
-                          gridData: FlGridData(show: false),
-                          titlesData: FlTitlesData(
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 40,
-                              ),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                getTitlesWidget: (value, meta) => Text(
-                                  'S ${value.toInt() + 1}',
-                                  style: const TextStyle(color: Colors.black54),
-                                ),
-                                interval: 1,
-                              ),
-                            ),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          barTouchData: BarTouchData(enabled: true),
-                        ),
-                      ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildChartCard(title: 'SGPA Progression', height: 250, chart: _buildBarChart()),
+                        const SizedBox(height: 16),
+                        _buildChartCard(title: 'Subject Distribution', height: 200, chart: _buildPieChart()),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    _buildChartCard(
-                      title: 'Subject Distribution',
-                      height: 200,
-                      chart: PieChart(
-                        PieChartData(
-                          sections: [
-                            PieChartSectionData(
-                              value: 69,
-                              title: 'Geography',
-                              color: Colors.blue,
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: 85,
-                              title: 'Algerico',
-                              color: Colors.green,
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: 15,
-                              title: 'Others',
-                              color: Colors.orange,
-                              radius: 50,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -219,73 +137,67 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String title, String value) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.end,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildChartCard({required String title, required double height, required Widget chart}) {
-    List<double> sgpaValues = [8.2, 8.5, 7.8, 8.9, 8.3, 9.1, 8.7, 9.0];
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            SizedBox(
-              height: height,
-              child: Stack(
-                children: [
-                  chart,
-                  for (var i = 0; i < sgpaValues.length; i++)
-                    Positioned(
-                      left: (i * (height / sgpaValues.length)) + (height / (sgpaValues.length * 2)) - 10,
-                      top: height - 20,
-                      child: Text(
-                        '${sgpaValues[i]}',
-                        style: const TextStyle(color: Colors.black),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            SizedBox(height: height, child: chart),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBarChart() {
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: 10,
+        barGroups: [
+          for (var i = 0; i < 8; i++)
+            BarChartGroupData(x: i, barRods: [
+              BarChartRodData(
+                toY: 7.5 + (i % 3),
+                color: Colors.blue,
+                width: 10,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ]),
+        ],
+        gridData: FlGridData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) => Text('S ${value.toInt() + 1}', style: const TextStyle(color: Colors.black54)),
+              interval: 1,
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        barTouchData: BarTouchData(enabled: true),
+      ),
+    );
+  }
+
+  Widget _buildPieChart() {
+    return PieChart(
+      PieChartData(
+        sections: [
+          PieChartSectionData(value: 40, title: 'Math', color: Colors.blue, radius: 50),
+          PieChartSectionData(value: 30, title: 'CS', color: Colors.green, radius: 50),
+          PieChartSectionData(value: 30, title: 'Others', color: Colors.orange, radius: 50),
+        ],
       ),
     );
   }

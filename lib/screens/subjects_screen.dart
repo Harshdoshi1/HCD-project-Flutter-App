@@ -9,8 +9,11 @@ class SubjectsScreen extends StatefulWidget {
   State<SubjectsScreen> createState() => _SubjectsScreenState();
 }
 
-class _SubjectsScreenState extends State<SubjectsScreen> {
+class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProviderStateMixin {
   int _selectedSemester = 1;
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   static const semesters = [
     {
@@ -40,12 +43,30 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ));
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -64,180 +85,96 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'My Subjects',
-                  style: TextStyle(
-                    color: AppTheme.onPrimaryColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: const Text(
+                    'My Subjects',
+                    style: TextStyle(
+                      color: AppTheme.onPrimaryColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: List.generate(8, (index) {
-                      final semester = index + 1;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: ChoiceChip(
-                          label: Text(
-                            'Sem $semester',
-                            style: TextStyle(
-                              color: _selectedSemester == semester
-                                  ? AppTheme.onPrimaryColor
-                                  : AppTheme.onBackgroundColor,
+                SlideTransition(
+                  position: _slideAnimation,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(8, (index) {
+                        final semester = index + 1;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: ChoiceChip(
+                            label: Text(
+                              'Sem $semester',
+                              style: TextStyle(
+                                color: _selectedSemester == semester
+                                    ? AppTheme.onPrimaryColor
+                                    : AppTheme.onBackgroundColor,
+                              ),
                             ),
+                            selected: _selectedSemester == semester,
+                            selectedColor: AppTheme.secondaryColor,
+                            backgroundColor: AppTheme.surfaceColor,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() {
+                                  _selectedSemester = semester;
+                                });
+                              }
+                            },
                           ),
-                          selected: _selectedSemester == semester,
-                          selectedColor: AppTheme.secondaryColor,
-                          backgroundColor: AppTheme.surfaceColor,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() {
-                                _selectedSemester = semester;
-                              });
-                            }
-                          },
-                        ),
-                      );
-                    }),
+                        );
+                      }),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: (_selectedSemester <= semesters.length)
-                  ? (semesters[_selectedSemester - 1]['subjects'] as List).length
-                  : 0,
-              itemBuilder: (context, index) {
-                final subjects = _selectedSemester <= semesters.length
-                    ? (semesters[_selectedSemester - 1]['subjects'] as List)
-                    : [];
-                final subject = subjects[index];
-                return Card(
-                  color: AppTheme.surfaceColor,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    title: Text(
-                      subject['name'] as String,
-                      style: const TextStyle(
-                        color: AppTheme.onBackgroundColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Code: ${subject['code']}',
-                      style: TextStyle(color: AppTheme.onBackgroundColor),
-                    ),
-                    trailing: Icon(
-                      Icons.arrow_forward_ios,
-                      color: AppTheme.onBackgroundColor,
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              SubjectDetailsScreen(subject: subject),
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: (_selectedSemester <= semesters.length)
+                      ? (semesters[_selectedSemester - 1]['subjects'] as List).length
+                      : 0,
+                  itemBuilder: (context, index) {
+                    final subjects = _selectedSemester <= semesters.length
+                        ? (semesters[_selectedSemester - 1]['subjects'] as List)
+                        : [];
+                    final subject = subjects[index];
+                    return Card(
+                      color: AppTheme.surfaceColor,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        title: Text(
+                          subject['name'] as String,
+                          style: const TextStyle(
+                            color: AppTheme.onBackgroundColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class SubjectDetailsScreen extends StatelessWidget {
-  final Map<String, dynamic> subject;
-
-  const SubjectDetailsScreen({Key? key, required this.subject}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final components = [
-      {'name': 'ESE (End Semester Exam)', 'marks': 100},
-      {'name': 'VIVA', 'marks': 100},
-      {'name': 'TERM WORK', 'marks': 100},
-      {'name': 'CSE (Class Semester Exam)', 'marks': 100},
-      {'name': 'IA (Internal Assessment)', 'marks': 100},
-    ];
-
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
-        title: Text(subject['name'] as String),
-      ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: AppTheme.surfaceColor,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Course Code: ${subject['code']}',
-                  style: const TextStyle(
-                    color: AppTheme.onBackgroundColor,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Assessment Components',
-                  style: TextStyle(
-                    color: AppTheme.onBackgroundColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: components.length,
-              itemBuilder: (context, index) {
-                final component = components[index];
-                return Card(
-                  color: AppTheme.surfaceColor,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    title: Text(
-                      component['name'] as String,
-                      style: const TextStyle(
-                        color: AppTheme.onBackgroundColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        subtitle: Text(
+                          'Code: ${subject['code']}',
+                          style: TextStyle(color: AppTheme.onBackgroundColor),
+                        ),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          color: AppTheme.onBackgroundColor,
+                        ),
                       ),
-                    ),
-                    subtitle: Text(
-                      'Marks: ${component['marks']}',
-                      style: TextStyle(color: AppTheme.onBackgroundColor),
-                    ),
-                    trailing: Icon(
-                      Icons.arrow_forward_ios,
-                      color: AppTheme.onBackgroundColor,
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ],
