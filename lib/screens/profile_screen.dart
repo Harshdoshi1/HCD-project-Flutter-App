@@ -21,19 +21,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
-    )..forward(); // Ensure the animation starts
-
-    _fadeInAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeIn,
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
+    _fadeInAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
+
+    _animationController.forward();
   }
 
   @override

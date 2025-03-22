@@ -83,16 +83,18 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
             ),
             color: AppTheme.primaryColor,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center, // Ensure the content is centered
               children: [
                 FadeTransition(
                   opacity: _fadeAnimation,
-                  child: const Text(
-                    'My Subjects',
-                    style: TextStyle(
-                      color: AppTheme.onPrimaryColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  child: Center( // Centering the text
+                    child: Text(
+                      'My Subjects',
+                      style: TextStyle(
+                        color: AppTheme.onPrimaryColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -102,6 +104,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(8, (index) {
                         final semester = index + 1;
                         return Padding(
