@@ -24,7 +24,7 @@ class DashboardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'MBA 6th Semester',
+                          'ICT 6th Semester',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -62,6 +62,13 @@ class DashboardScreen extends StatelessWidget {
                         topLeft: Radius.circular(30),
                         topRight: Radius.circular(30),
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(16),

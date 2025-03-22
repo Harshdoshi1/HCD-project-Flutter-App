@@ -15,25 +15,25 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
     {
       'name': 'Semester 1',
       'subjects': [
-        {'name': 'Engineering Mathematics I', 'code': 'MA101'},
-        {'name': 'Engineering Physics', 'code': 'PH101'},
-        {'name': 'Engineering Chemistry', 'code': 'CH101'},
+        {'name': 'ICE', 'code': 'MA101'},
+        {'name': 'FSSI', 'code': 'PH101'},
+        {'name': 'AC', 'code': 'CH101'},
       ]
     },
     {
       'name': 'Semester 2',
       'subjects': [
-        {'name': 'Engineering Mathematics II', 'code': 'MA201'},
-        {'name': 'Basic Electronics', 'code': 'EC201'},
-        {'name': 'Programming Fundamentals', 'code': 'CS201'},
+        {'name': 'OOP', 'code': 'MA201'},
+        {'name': 'DLD', 'code': 'EC201'},
+        {'name': 'MAVC', 'code': 'CS201'},
       ]
     },
     {
       'name': 'Semester 3',
       'subjects': [
-        {'name': 'Data Structures', 'code': 'CS301'},
-        {'name': 'Digital Logic', 'code': 'CS302'},
-        {'name': 'Computer Networks', 'code': 'CS303'},
+        {'name': 'Data Structure', 'code': 'CS301'},
+        {'name': 'DMGT', 'code': 'CS302'},
+        {'name': 'Iwt', 'code': 'CS303'},
       ]
     },
   ];
