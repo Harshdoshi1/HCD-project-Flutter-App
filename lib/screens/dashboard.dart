@@ -10,12 +10,15 @@ class DashboardScreen extends StatefulWidget {
   _DashboardScreenState createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeTextAnimation;
   late Animation<Offset> _slideTextAnimation;
+  late AnimationController _animationController;
+  final double _barValue = 100; // Example target value for bar chart
+  final double _pieValue = 70; // Example target value for pie chart
 
   @override
   void initState() {
@@ -40,12 +43,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _animationController.forward();
+
     _controller.forward();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -125,9 +135,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _buildChartCard(title: 'SGPA Progression', height: 250, chart: _buildBarChart()),
+                        _buildChartCard(title: 'SGPA Progression', height: 250, chart: _buildAnimatedBarChart()),
                         const SizedBox(height: 16),
-                        _buildChartCard(title: 'Subject Distribution', height: 200, chart: _buildPieChart()),
+                        _buildChartCard(title: 'Subject Distribution', height: 200, chart: _buildAnimatedPieChart()),
                       ],
                     ),
                   ),
@@ -165,50 +175,61 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildBarChart() {
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: 10,
-        barGroups: [
-          for (var i = 0; i < 8; i++)
-            BarChartGroupData(x: i, barRods: [
-              BarChartRodData(
-                toY: 7.5 + (i % 3),
-                color: Colors.blue,
-                width: 10,
-                borderRadius: BorderRadius.circular(10),
+  Widget _buildAnimatedBarChart() {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        double animatedBarValue = _barValue * _animationController.value;
+        return BarChart(
+          BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            maxY: 10,
+            barGroups: [
+              for (var i = 0; i < 8; i++)
+                BarChartGroupData(x: i, barRods: [
+                  BarChartRodData(
+                    toY: (7.5 + (i % 3)) * _animationController.value,
+                    color: Colors.blue,
+                    width: 10,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ]),
+            ],
+            gridData: FlGridData(show: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 40),
               ),
-            ]),
-        ],
-        gridData: FlGridData(show: false),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) => Text('S ${value.toInt() + 1}', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-              interval: 1,
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, meta) => Text('S ${value.toInt() + 1}', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+                  interval: 1,
+                ),
+              ),
             ),
+            borderData: FlBorderData(show: false),
+            barTouchData: BarTouchData(enabled: true),
           ),
-        ),
-        borderData: FlBorderData(show: false),
-        barTouchData: BarTouchData(enabled: true),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildPieChart() {
-    return PieChart(
-      PieChartData(
-        sections: [
-          PieChartSectionData(value: 40, title: 'Math', color: Colors.blue, radius: 50),
-          PieChartSectionData(value: 30, title: 'CS', color: Colors.green, radius: 50),
-          PieChartSectionData(value: 30, title: 'Others', color: Colors.orange, radius: 50),
-        ],
-      ),
+  Widget _buildAnimatedPieChart() {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return PieChart(
+          PieChartData(
+            sections: [
+              PieChartSectionData(value: 40 * _animationController.value, title: 'HCD', color: Colors.blue, radius: 50),
+              PieChartSectionData(value: 30 * _animationController.value, title: 'CPSI', color: Colors.green, radius: 50),
+              PieChartSectionData(value: 30 * _animationController.value, title: 'DAA', color: Colors.orange, radius: 50),
+            ],
+          ),
+        );
+      },
     );
   }
 }
