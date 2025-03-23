@@ -174,7 +174,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.only(bottom: 12),
-      color: Theme.of(context).cardColor,
+      color: Theme.of(context).colorScheme.surface, // Use darkSurfaceColor from cardTheme
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
@@ -189,15 +189,15 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
         ),
         title: Text(
           name,
-          style: const TextStyle(
-            color: AppTheme.onBackgroundColor,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(color: AppTheme.onBackgroundColor),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
       ),
     );

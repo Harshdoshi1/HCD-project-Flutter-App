@@ -43,7 +43,8 @@ class SubjectDetailScreen extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Container(
+                  color: Theme.of(context).cardColor, // Use theme's card color
+                  child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

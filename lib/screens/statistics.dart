@@ -12,11 +12,11 @@ class StatisticsScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: Colors.lightBlue,
-            child: const Text(
+            color: Theme.of(context).colorScheme.primary,
+            child: Text(
               'Statistics',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -33,17 +33,19 @@ class StatisticsScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _buildStatCard(
+                          context: context,
                           title: 'Overall Grade',
                           value: '85%',
-                          color: Colors.lightBlue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _buildStatCard(
+                          context: context,
                           title: 'Attendance',
                           value: '90%',
-                          color: Colors.lightBlue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],
@@ -54,17 +56,19 @@ class StatisticsScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _buildStatCard(
+                          context: context,
                           title: 'Homework',
                           value: '75%',
-                          color: Colors.lightBlue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _buildStatCard(
+                          context: context,
                           title: 'Projects',
                           value: '60%',
-                          color: Colors.lightBlue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],
@@ -74,11 +78,16 @@ class StatisticsScreen extends StatelessWidget {
                   Container(
                     height: 200,
                     decoration: BoxDecoration(
-                      color: Colors.lightBlue.shade50,
+                      color: Theme.of(context).colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Center(
-                      child: Text('Chart Placeholder'),
+                    child: Center(
+                      child: Text(
+                        'Chart Placeholder',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -91,32 +100,29 @@ class StatisticsScreen extends StatelessWidget {
   }
 
   Widget _buildStatCard({
+    required BuildContext context,
     required String title,
     required String value,
     required Color color,
   }) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
+      color: color,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 16,
+              ),
+            ),
             Text(
               value,
               style: TextStyle(
-                color: color,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.black54,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 14,
               ),
             ),

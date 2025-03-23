@@ -78,10 +78,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     position: _slideTextAnimation,
                     child: FadeTransition(
                       opacity: _fadeTextAnimation,
-                      child: const Text(
+                      child: Text(
                         'Welcome, Harsh Doshi',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
@@ -149,7 +149,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(height: height, child: chart),
           ],
@@ -182,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (value, meta) => Text('S ${value.toInt() + 1}', style: const TextStyle(color: Colors.black54)),
+              getTitlesWidget: (value, meta) => Text('S ${value.toInt() + 1}', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
               interval: 1,
             ),
           ),

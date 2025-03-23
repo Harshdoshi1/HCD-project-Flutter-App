@@ -55,9 +55,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       appBar: AppBar(
         backgroundColor: theme.primary,
         title: Text(
-          'Student Profile',
+          'My Profile',
           style: TextStyle(
-            color: theme.onPrimary,
+            color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -87,8 +87,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 _buildAnimatedInfoCard('Academic Information', [
                   _buildInfoRow('Department', 'Information & Communication Technology'),
                   _buildInfoRow('Semester', '5th'),
-                  _buildInfoRow('CGPA', '3.8'),
-                  _buildInfoRow('Rank', 'Top 10%'),
+                  _buildInfoRow('CGPA', '8.8'),
+                  _buildInfoRow('Rank', 'Top 10'),
                   _buildInfoRow('Attendance', '85%'),
                 ], theme),
                 _buildAnimatedInfoCard('Additional Information', [
@@ -176,14 +176,22 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             flex: 4,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
           Expanded(
             flex: 6,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               textAlign: TextAlign.right,
             ),
           ),

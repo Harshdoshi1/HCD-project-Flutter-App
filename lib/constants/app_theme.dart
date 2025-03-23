@@ -13,17 +13,24 @@ class AppTheme {
   static const Color onBackgroundColor = Color(0xFF000000);
   static const Color onSurfaceColor = Color(0xFF000000);
   static const Color errorColor = Color(0xFFD32F2F);
+  
 
   // Dark Theme Colors
   static const Color darkPrimaryColor = Color(0xFF1E88E5);
-  static const Color darkPrimaryColorLight = Color(0xFF64B5F6); // Newly added
+  static const Color darkPrimaryColorLight = Color(0xFF64B5F6);
   static const Color darkSecondaryColor = Color(0xFF64B5F6);
-  static const Color darkBackgroundColor = Color(0xFF121212);
-  static const Color darkSurfaceColor = Color(0xFF222222);
+  static const Color darkBackgroundColor = Color.fromARGB(255, 0, 0, 0);
+  static const Color darkSurfaceColor = Color(0xFF1E1E1E);
   static const Color darkOnPrimaryColor = Color(0xFFFFFFFF);
   static const Color darkOnSecondaryColor = Color(0xFFFFFFFF);
-  static const Color darkOnBackgroundColor = Color(0xFFB0BEC5);
+  static const Color darkOnBackgroundColor = Color(0xFFE0E0E0);
   static const Color darkOnSurfaceColor = Color(0xFFEEEEEE);
+  static const Color darkErrorColor = Color(0xFFCF6679);
+
+  // Bottom Navigation Bar Theme Colors
+  static Color get bottomNavigationBarSelectedItemColor => darkPrimaryColor;
+  static Color get bottomNavigationBarUnselectedItemColor => darkOnSurfaceColor.withOpacity(0.6);
+  static Color get bottomNavigationBarBackgroundColor => const Color.fromARGB(255, 0, 0, 0); // or Colors.black for dark theme
 
   // Light Theme Configuration
   static ThemeData get lightTheme => ThemeData(
@@ -32,9 +39,9 @@ class AppTheme {
         scaffoldBackgroundColor: backgroundColor,
         colorScheme: const ColorScheme.light(
           primary: primaryColor,
-          primaryContainer: primaryColorLight, // Added light variant
+          primaryContainer: primaryColorLight,
           secondary: secondaryColor,
-          secondaryContainer: secondaryColorLight, // Added light variant
+          secondaryContainer: secondaryColorLight,
           background: backgroundColor,
           surface: surfaceColor,
           onPrimary: onPrimaryColor,
@@ -42,12 +49,18 @@ class AppTheme {
           onBackground: onBackgroundColor,
           onSurface: onSurfaceColor,
           error: errorColor,
+          
         ),
         appBarTheme: _appBarTheme(primaryColor, onPrimaryColor),
         cardTheme: _cardTheme(surfaceColor),
-        textTheme: _textTheme(onBackgroundColor),
+        textTheme: _textTheme(Colors.black), 
         buttonTheme: _buttonTheme(primaryColor),
         inputDecorationTheme: _inputDecorationTheme(surfaceColor, onSurfaceColor),
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: Colors.white,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: onSurfaceColor.withOpacity(0.6),
+        ),
       );
 
   // Dark Theme Configuration
@@ -57,21 +70,31 @@ class AppTheme {
         scaffoldBackgroundColor: darkBackgroundColor,
         colorScheme: const ColorScheme.dark(
           primary: darkPrimaryColor,
-          primaryContainer: darkPrimaryColorLight, // Added light variant
+          primaryContainer: darkPrimaryColorLight,
           secondary: darkSecondaryColor,
-          background: darkBackgroundColor,
-          surface: darkSurfaceColor,
+          background: Color.fromARGB(255, 0, 0, 0),
+          surface: Color.fromARGB(255, 0, 0, 0),
           onPrimary: darkOnPrimaryColor,
           onSecondary: darkOnSecondaryColor,
           onBackground: darkOnBackgroundColor,
           onSurface: darkOnSurfaceColor,
-          error: errorColor,
+          error: darkErrorColor,
+
         ),
         appBarTheme: _appBarTheme(darkSurfaceColor, darkOnSurfaceColor),
         cardTheme: _cardTheme(darkSurfaceColor),
-        textTheme: _textTheme(darkOnBackgroundColor),
+        textTheme: _textTheme(Colors.white), 
         buttonTheme: _buttonTheme(darkPrimaryColor),
         inputDecorationTheme: _inputDecorationTheme(darkSurfaceColor, darkOnSurfaceColor),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: darkPrimaryColor,
+          foregroundColor: darkOnPrimaryColor,
+        ),
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: bottomNavigationBarBackgroundColor,
+          selectedItemColor: bottomNavigationBarSelectedItemColor,
+          unselectedItemColor: bottomNavigationBarUnselectedItemColor,
+        ),
       );
 
   // AppBar Theme
@@ -94,15 +117,15 @@ class AppTheme {
 
   // Text Theme
   static TextTheme _textTheme(Color color) => TextTheme(
-        displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: color),
-        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
-        displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color),
-        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
-        headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
-        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
-        bodyLarge: TextStyle(fontSize: 16, color: color),
-        bodyMedium: TextStyle(fontSize: 14, color: color),
-        bodySmall: TextStyle(fontSize: 12, color: color),
+        displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: color, fontFamily: 'Helvetica'),
+        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color, fontFamily: 'Helvetica'),
+        displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color, fontFamily: 'Helvetica'),
+        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color, fontFamily: 'Helvetica'),
+        headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color, fontFamily: 'Helvetica'),
+        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color, fontFamily: 'Helvetica'),
+        bodyLarge: TextStyle(fontSize: 16, color: color, fontFamily: 'Helvetica'),
+        bodyMedium: TextStyle(fontSize: 14, color: color, fontFamily: 'Helvetica'),
+        bodySmall: TextStyle(fontSize: 12, color: color, fontFamily: 'Helvetica'),
       );
 
   // Button Theme

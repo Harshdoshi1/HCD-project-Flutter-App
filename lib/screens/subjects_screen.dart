@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../constants/app_theme.dart';
+import 'subject_detail_screen.dart';
+
+// Move the Subject class to the top level
+class Subject {
+  final String name;
+  final String code;
+  final String status; // Passed, Failed, Not declared
+  final double grade; // Example grade
+
+  Subject({required this.name, required this.code, required this.status, required this.grade});
+}
 
 class SubjectsScreen extends StatefulWidget {
   const SubjectsScreen({Key? key}) : super(key: key);
@@ -82,7 +92,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               left: 16,
               right: 16,
             ),
-            color: AppTheme.primaryColor, // Adjusted
+            color: colorScheme.primary, // ICT Blue
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -92,7 +102,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                     child: Text(
                       'My Subjects',
                       style: TextStyle(
-                        color: AppTheme.onPrimaryColor, // Adjusted
+                        color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -115,13 +125,13 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                               'Sem $semester',
                               style: TextStyle(
                                 color: _selectedSemester == semester
-                                    ? AppTheme.onPrimaryColor
-                                    : AppTheme.onBackgroundColor,
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onBackground,
                               ),
                             ),
                             selected: _selectedSemester == semester,
-                            selectedColor: AppTheme.secondaryColor,
-                            backgroundColor: AppTheme.surfaceColor,
+                            selectedColor: Theme.of(context).colorScheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.surface,
                             onSelected: (selected) {
                               if (selected) {
                                 setState(() {
@@ -153,25 +163,38 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                     final subjects = semesters[_selectedSemester - 1]['subjects'] as List;
                     final subject = subjects[index] as Map<String, dynamic>;
                     return Card(
-                      color: AppTheme.surfaceColor,
+                      color: Theme.of(context).cardTheme.color, // Use theme's card color from cardTheme
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SubjectDetailScreen(subject: Subject(
+                                name: subject['name'],
+                                code: subject['code'],
+                                status: 'Not declared', // Placeholder
+                                grade: 0.0, // Placeholder
+                              )),
+                            ),
+                          );
+                        },
                         contentPadding: const EdgeInsets.all(16),
                         title: Text(
                           subject['name'],
-                          style: const TextStyle(
-                            color: AppTheme.onBackgroundColor,
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         subtitle: Text(
                           'Code: ${subject['code']}',
-                          style: const TextStyle(color: AppTheme.onBackgroundColor),
+                          style: TextStyle(color: colorScheme.onSurface),
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.arrow_forward_ios,
-                          color: AppTheme.onBackgroundColor,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     );
