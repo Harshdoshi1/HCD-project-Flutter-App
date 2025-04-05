@@ -46,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     return Scaffold(
       backgroundColor: theme.background,
       appBar: AppBar(
-        backgroundColor: theme.primary,
+        backgroundColor: const Color(0xFF03A9F4), // Consistent blue
         title: Text(
           'My Profile',
           style: TextStyle(

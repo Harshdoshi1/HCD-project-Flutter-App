@@ -11,7 +11,7 @@ class ProfileScreen extends StatelessWidget {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          color: Colors.lightBlue,
+          color: const Color(0xFF03A9F4),
           child: const Text(
             'My Profile',
             style: TextStyle(

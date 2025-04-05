@@ -87,7 +87,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
         right: 20,
         bottom: 16,
       ),
-      color: AppTheme.primaryColor, // Fixed theme reference
+      color: const Color(0xFF03A9F4), // Fixed theme reference
       child: Column(
         children: [
           const Text(

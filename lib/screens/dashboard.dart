@@ -80,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 right: 20,
                 bottom: 20,
               ),
-              color: colorScheme.primary,
+              color: const Color(0xFF03A9F4), // Consistent blue
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

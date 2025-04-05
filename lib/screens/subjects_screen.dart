@@ -92,7 +92,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               left: 16,
               right: 16,
             ),
-            color: colorScheme.primary, // ICT Blue
+            color: const Color(0xFF03A9F4), // Consistent blue
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
