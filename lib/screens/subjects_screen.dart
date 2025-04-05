@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'subject_detail_screen.dart';
 
-// Move the Subject class to the top level
+// In subjects_screen.dart
 class Subject {
   final String name;
   final String code;
-  final String status; // Passed, Failed, Not declared
-  final String grade; // Example grade
+  final String status;
+  final String grade;
   final Map<String, dynamic> components;
 
   Subject({
@@ -17,6 +17,25 @@ class Subject {
     required this.grade,
     required this.components,
   });
+
+  double get totalMarks => components.values.fold(
+        0, 
+        (sum, component) => sum + (component['marks'] ?? 0)
+      );
+
+  double get maxMarks => components.values.fold(
+        0, 
+        (sum, component) => sum + (component['outOf'] ?? 0)
+      );
+
+  double get percentage => maxMarks > 0 ? (totalMarks / maxMarks) * 100 : 0;
+
+  String get performanceLevel {
+    if (percentage >= 85) return 'Excellent';
+    if (percentage >= 70) return 'Good';
+    if (percentage >= 55) return 'Average';
+    return 'Needs Improvement';
+  }
 }
 
 class SubjectsScreen extends StatefulWidget {
