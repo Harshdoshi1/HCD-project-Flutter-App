@@ -7,9 +7,16 @@ class Subject {
   final String name;
   final String code;
   final String status; // Passed, Failed, Not declared
-  final double grade; // Example grade
+  final String grade; // Example grade
+  final Map<String, dynamic> components;
 
-  Subject({required this.name, required this.code, required this.status, required this.grade});
+  Subject({
+    required this.name,
+    required this.code,
+    required this.status,
+    required this.grade,
+    required this.components,
+  });
 }
 
 class SubjectsScreen extends StatefulWidget {
@@ -29,25 +36,124 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     {
       'name': 'Semester 1',
       'subjects': [
-        {'name': 'ICE', 'code': 'MA101'},
-        {'name': 'FSSI', 'code': 'PH101'},
-        {'name': 'AC', 'code': 'CH101'},
+        {
+          'name': 'ICE',
+          'code': 'MA101',
+          'grade': 'A',
+          'components': {
+            'IA': {'marks': 28, 'outOf': 30},
+            'Viva': {'marks': 22, 'outOf': 25},
+            'Assignment': {'marks': 23, 'outOf': 25},
+            'CSE': {'marks': 18, 'outOf': 20},
+            'ESE': {'marks': 45, 'outOf': 50},
+          },
+        },
+        {
+          'name': 'FSSI',
+          'code': 'PH101',
+          'grade': 'A+',
+          'components': {
+            'IA': {'marks': 29, 'outOf': 30},
+            'Viva': {'marks': 24, 'outOf': 25},
+            'Assignment': {'marks': 24, 'outOf': 25},
+            'CSE': {'marks': 19, 'outOf': 20},
+            'ESE': {'marks': 48, 'outOf': 50},
+          },
+        },
+        {
+          'name': 'AC',
+          'code': 'CH101',
+          'grade': 'B+',
+          'components': {
+            'IA': {'marks': 26, 'outOf': 30},
+            'Viva': {'marks': 20, 'outOf': 25},
+            'Assignment': {'marks': 21, 'outOf': 25},
+            'CSE': {'marks': 17, 'outOf': 20},
+            'ESE': {'marks': 42, 'outOf': 50},
+          },
+        },
       ]
     },
     {
       'name': 'Semester 2',
       'subjects': [
-        {'name': 'OOP', 'code': 'MA201'},
-        {'name': 'DLD', 'code': 'EC201'},
-        {'name': 'MAVC', 'code': 'CS201'},
+        {
+          'name': 'OOP',
+          'code': 'MA201',
+          'grade': 'A',
+          'components': {
+            'IA': {'marks': 28, 'outOf': 30},
+            'Viva': {'marks': 22, 'outOf': 25},
+            'Assignment': {'marks': 23, 'outOf': 25},
+            'CSE': {'marks': 18, 'outOf': 20},
+            'ESE': {'marks': 45, 'outOf': 50},
+          },
+        },
+        {
+          'name': 'DLD',
+          'code': 'EC201',
+          'grade': 'A+',
+          'components': {
+            'IA': {'marks': 29, 'outOf': 30},
+            'Viva': {'marks': 24, 'outOf': 25},
+            'Assignment': {'marks': 24, 'outOf': 25},
+            'CSE': {'marks': 19, 'outOf': 20},
+            'ESE': {'marks': 48, 'outOf': 50},
+          },
+        },
+        {
+          'name': 'MAVC',
+          'code': 'CS201',
+          'grade': 'B+',
+          'components': {
+            'IA': {'marks': 26, 'outOf': 30},
+            'Viva': {'marks': 20, 'outOf': 25},
+            'Assignment': {'marks': 21, 'outOf': 25},
+            'CSE': {'marks': 17, 'outOf': 20},
+            'ESE': {'marks': 42, 'outOf': 50},
+          },
+        },
       ]
     },
     {
       'name': 'Semester 3',
       'subjects': [
-        {'name': 'Data Structure', 'code': 'CS301'},
-        {'name': 'DMGT', 'code': 'CS302'},
-        {'name': 'Iwt', 'code': 'CS303'},
+        {
+          'name': 'Data Structure',
+          'code': 'CS301',
+          'grade': 'A',
+          'components': {
+            'IA': {'marks': 28, 'outOf': 30},
+            'Viva': {'marks': 22, 'outOf': 25},
+            'Assignment': {'marks': 23, 'outOf': 25},
+            'CSE': {'marks': 18, 'outOf': 20},
+            'ESE': {'marks': 45, 'outOf': 50},
+          },
+        },
+        {
+          'name': 'DMGT',
+          'code': 'CS302',
+          'grade': 'A+',
+          'components': {
+            'IA': {'marks': 29, 'outOf': 30},
+            'Viva': {'marks': 24, 'outOf': 25},
+            'Assignment': {'marks': 24, 'outOf': 25},
+            'CSE': {'marks': 19, 'outOf': 20},
+            'ESE': {'marks': 48, 'outOf': 50},
+          },
+        },
+        {
+          'name': 'Iwt',
+          'code': 'CS303',
+          'grade': 'B+',
+          'components': {
+            'IA': {'marks': 26, 'outOf': 30},
+            'Viva': {'marks': 20, 'outOf': 25},
+            'Assignment': {'marks': 21, 'outOf': 25},
+            'CSE': {'marks': 17, 'outOf': 20},
+            'ESE': {'marks': 42, 'outOf': 50},
+          },
+        },
       ]
     },
   ];
@@ -170,12 +276,15 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => SubjectDetailScreen(subject: Subject(
-                                name: subject['name'],
-                                code: subject['code'],
-                                status: 'Not declared', // Placeholder
-                                grade: 0.0, // Placeholder
-                              )),
+                              builder: (context) => SubjectDetailScreen(
+                                subject: Subject(
+                                  name: subject['name'],
+                                  code: subject['code'],
+                                  status: subject['grade'] == 'A' || subject['grade'] == 'A+' || subject['grade'] == 'B+' ? 'Passed' : 'Failed',
+                                  grade: subject['grade'],
+                                  components: subject['components'],
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -189,7 +298,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                           ),
                         ),
                         subtitle: Text(
-                          'Code: ${subject['code']}',
+                          'Grade: ${subject['grade']}',
                           style: TextStyle(color: colorScheme.onSurface),
                         ),
                         trailing: Icon(
