@@ -37,7 +37,7 @@ class SubjectDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Row(
@@ -74,19 +74,28 @@ class SubjectDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Row(
               children: [
-                _buildStatItem('Grade', subject.grade, _getGradeColor(subject.grade)),
-                const SizedBox(width: 12),
-                _buildStatItem('Percentage', '${subject.percentage.toStringAsFixed(1)}%',
-                    _getPerformanceColor(subject.percentage)),
-                const SizedBox(width: 12),
-                _buildStatItem('Marks', '${subject.totalMarks.toInt()}/${subject.maxMarks.toInt()}',
-                    const Color(0xFF03A9F4)),
+                Expanded(
+                  flex: 2,
+                  child: _buildStatItem('Grade', subject.grade, _getGradeColor(subject.grade)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _buildStatItem('Percentage', '${subject.percentage.toStringAsFixed(1)}%',
+                      _getPerformanceColor(subject.percentage)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 4,
+                  child: _buildStatItem('Marks', '${subject.totalMarks.toInt()}/${subject.maxMarks.toInt()}',
+                      const Color(0xFF03A9F4)),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             LinearProgressIndicator(
               value: subject.percentage / 100,
               minHeight: 12,
