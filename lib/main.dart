@@ -34,7 +34,7 @@ class _MyAppState extends State<MyApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,
-      // Example: using a bottom navigation bar to switch between pages.
+
       home: HomeScreen(toggleTheme: _toggleTheme),
     );
   }
