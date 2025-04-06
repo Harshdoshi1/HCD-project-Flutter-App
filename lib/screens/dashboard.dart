@@ -19,6 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   late AnimationController _animationController;
   final double _barValue = 100; // Example target value for bar chart
   final double _pieValue = 70; // Example target value for pie chart
+  String _activeGraph = 'sgpa'; // Default to SGPA graph
 
   @override
   void initState() {
@@ -61,9 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    // Using SystemChrome is optional – you can adjust based on your needs.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -80,7 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 right: 20,
                 bottom: 20,
               ),
-              color: const Color(0xFF03A9F4), // Consistent blue
+              color: const Color(0xFF03A9F4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -135,9 +134,20 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _buildChartCard(title: 'SGPA Progression', height: 250, chart: _buildAnimatedBarChart()),
-                        const SizedBox(height: 16),
-                        _buildChartCard(title: 'Subject Distribution', height: 200, chart: _buildAnimatedPieChart()),
+                        _buildIconRow(),
+                        const SizedBox(height: 20),
+                        if (_activeGraph == 'sgpa')
+                          _buildChartCard(
+                            title: 'SGPA Progression', 
+                            height: 250, 
+                            chart: _buildAnimatedBarChart()
+                          )
+                        else if (_activeGraph == 'expertise')
+                          _buildChartCard(
+                            title: 'Subject Distribution', 
+                            height: 250, 
+                            chart: _buildAnimatedPieChart()
+                          ),
                       ],
                     ),
                   ),
@@ -147,6 +157,53 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildIconRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _activeGraph = 'sgpa'),
+          child: _buildDashboardIcon(
+            Icons.school, 
+            'SGPA', 
+            _activeGraph == 'sgpa' ? Colors.blue : Colors.grey
+          ),
+        ),
+        GestureDetector(
+          onTap: () => setState(() => _activeGraph = 'expertise'),
+          child: _buildDashboardIcon(
+            Icons.star, 
+            'Expertise', 
+            _activeGraph == 'expertise' ? Colors.orange : Colors.grey
+          ),
+        ),
+        _buildDashboardIcon(Icons.menu_book, 'Subjects', Colors.green),
+        _buildDashboardIcon(Icons.work, 'Projects', Colors.purple),
+      ],
+    );
+  }
+
+  Widget _buildDashboardIcon(IconData icon, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 30, color: color),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        ),
+      ],
     );
   }
 
