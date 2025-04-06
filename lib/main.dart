@@ -3,7 +3,9 @@ import 'screens/dashboard.dart';
 import 'screens/profile_screen.dart';
 import 'screens/rankings_screen.dart';
 import 'screens/subjects_screen.dart';
+import 'widgets/login_form.dart';
 import 'constants/app_theme.dart';
+import 'models/user.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,6 +21,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   // Start with light mode.
   ThemeMode _themeMode = ThemeMode.light;
+  User? _currentUser;
 
   void _toggleTheme() {
     setState(() {
@@ -26,7 +29,7 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  @override 
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Dashboard',
@@ -35,73 +38,28 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,
       // Example: using a bottom navigation bar to switch between pages.
-      home: HomeScreen(toggleTheme: _toggleTheme),
+      home: _currentUser == null 
+          ? LoginScreen(onLoginSuccess: (User user) {
+              setState(() {
+                _currentUser = user;
+              });
+            }) 
+          : DashboardScreen(currentUser: _currentUser!),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  final VoidCallback toggleTheme;
-  const HomeScreen({Key? key, required this.toggleTheme}) : super(key: key);
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-// A simple bottom navigation layout for demonstration
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  static const List<Widget> _pagesPlaceholder = <Widget>[
-    DashboardScreen(),
-    SubjectsScreen(),
-    RankingsScreen(),
-    // The ProfileScreen needs the toggleTheme callback.
-  ];
+class LoginScreen extends StatelessWidget {
+  final Function(User)? onLoginSuccess;
+  const LoginScreen({Key? key, this.onLoginSuccess}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Create a list of pages, including ProfileScreen with toggle callback.
-    final List<Widget> pages = [
-      const DashboardScreen(),
-      const SubjectsScreen(),
-      const RankingsScreen(),
-      ProfileScreen(toggleTheme: widget.toggleTheme),
-    ];
-    
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurface,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        onTap: (int index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: 'Subjects',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.leaderboard),
-            label: 'Rankings',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+      body: Center(
+        child: LoginForm(
+          onLoginSuccess: onLoginSuccess,
+        ),
       ),
     );
   }

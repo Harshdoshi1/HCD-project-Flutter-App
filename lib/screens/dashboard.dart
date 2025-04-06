@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_theme.dart';
+import '../models/user.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  final User currentUser;
+  const DashboardScreen({
+    Key? key,
+    required this.currentUser,
+  }) : super(key: key);
 
   @override
   _DashboardScreenState createState() => _DashboardScreenState();
@@ -88,7 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     child: FadeTransition(
                       opacity: _fadeTextAnimation,
                       child: Text(
-                        'Welcome, Harsh Doshi',
+                        'Welcome, ${widget.currentUser.email}',
                         style: TextStyle(
                           color: colorScheme.onPrimary,
                           fontSize: 22,

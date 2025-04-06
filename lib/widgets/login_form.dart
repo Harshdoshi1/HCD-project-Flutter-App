@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../screens/dashboard.dart';
+import '../models/user.dart';
 
 class LoginForm extends StatefulWidget {
-  const LoginForm({super.key});
+  final Function(User)? onLoginSuccess;
+  const LoginForm({super.key, this.onLoginSuccess});
 
   @override
   State<LoginForm> createState() => _LoginFormState();
@@ -11,32 +15,126 @@ class LoginForm extends StatefulWidget {
 class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  User? _currentUser;
 
-  void _performLogin() {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  void _performLogin() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
       });
-      // Simulate a login delay of 2 seconds
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return; // Ensure widget is still in the tree
+
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      if (email.isEmpty || password.isEmpty) {
         setState(() {
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.green,
+            content: Text('Please fill in all fields'),
+            backgroundColor: Colors.red,
           ),
         );
-        // Navigate to dashboard screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const DashboardScreen(),
+        return;
+      }
+
+      try {
+        final response = await http.post(
+          Uri.parse('http://localhost:5001/api/users/login'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'email': email,
+            'password': password,
+          }),
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          final responseData = jsonDecode(response.body);
+          
+          if (responseData is Map<String, dynamic>) {
+            try {
+              // Create user object with the received data
+              _currentUser = User(
+                email: email,
+                password: password,
+              );
+              
+              setState(() {
+                _isLoading = false;
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Login successful!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+
+              if (widget.onLoginSuccess != null) {
+                widget.onLoginSuccess!(_currentUser!);
+              }
+            } catch (e) {
+              setState(() {
+                _isLoading = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error creating user: ${e.toString()}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          } else {
+            setState(() {
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid response format'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+          final errorData = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorData['message'] ?? 'Login failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
-      });
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -77,6 +175,7 @@ class _LoginFormState extends State<LoginForm> {
               ),
               const SizedBox(height: 32),
               TextFormField(
+                controller: _emailController,
                 decoration: InputDecoration(
                   labelText: 'Email',
                   prefixIcon: const Icon(Icons.email),
@@ -96,6 +195,7 @@ class _LoginFormState extends State<LoginForm> {
               ),
               const SizedBox(height: 20),
               TextFormField(
+                controller: _passwordController,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon: const Icon(Icons.lock),
