@@ -44,7 +44,7 @@ class _MyAppState extends State<MyApp> {
                 _currentUser = user;
               });
             }) 
-          : DashboardScreen(currentUser: _currentUser!),
+          : DashboardScreen(),
     );
   }
 }
