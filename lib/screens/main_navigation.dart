@@ -23,7 +23,7 @@ class _MainNavigationState extends State<MainNavigation> {
     final List<Widget> _widgetOptions = <Widget>[
       DashboardScreen(),
       SubjectsScreen(),
-      RankingsScreen(),
+      RankingsScreen(toggleTheme: widget.toggleTheme),
       ProfileScreen(toggleTheme: widget.toggleTheme), // Pass toggleTheme here
     ];
 

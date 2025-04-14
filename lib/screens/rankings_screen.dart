@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
+import 'profile_screen.dart';
+import 'student_detail_screen.dart';
 
 class RankingsScreen extends StatefulWidget {
-  const RankingsScreen({Key? key}) : super(key: key);
+  const RankingsScreen({Key? key, required this.toggleTheme}) : super(key: key);
+  
+  final VoidCallback toggleTheme;
 
   @override
   State<RankingsScreen> createState() => _RankingsScreenState();
@@ -136,6 +140,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
                       borderSide: BorderSide(width: 3, color: Colors.white),
                       insets: EdgeInsets.symmetric(horizontal: 16),
                     ),
+                    labelPadding: EdgeInsets.symmetric(horizontal: 24),
                     onTap: (index) {
                       _pageController.animateToPage(
                         index,
@@ -206,56 +211,77 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   }
 
   Widget _buildRankingCard({required int rank, required String name, required String subtitle}) {
-    return GlassmorphicContainer(
-      width: double.infinity,
-      height: 90,
-      borderRadius: 12,
-      blur: 20,
-      alignment: Alignment.center,
-      border: 2,
-      linearGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withOpacity(0.1),
-          Colors.white.withOpacity(0.05),
-        ],
-      ),
-      borderGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withOpacity(0.05),
-          Colors.white.withOpacity(0.1),
-        ],
-      ),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Center(
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: CircleAvatar(
-            backgroundColor: rank <= 3 ? Colors.amber : Colors.grey[700],
-            child: Text(
-              '$rank',
-              style: const TextStyle(
-                color: Colors.white,
+    return GestureDetector(
+      onTap: () {
+        if (name == 'Harsh Doshi') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ProfileScreen(toggleTheme: widget.toggleTheme)),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentDetailScreen(
+                name: name,
+                rank: rank.toString(),
+                details: subtitle,
+              ),
+            ),
+          );
+        }
+      },
+      child: GlassmorphicContainer(
+        width: double.infinity,
+        height: 90,
+        borderRadius: 12,
+        blur: 20,
+        alignment: Alignment.center,
+        border: 2,
+        linearGradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.1),
+            Colors.white.withOpacity(0.05),
+          ],
+        ),
+        borderGradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.05),
+            Colors.white.withOpacity(0.1),
+          ],
+        ),
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Center(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: rank <= 3 ? Colors.amber : Colors.grey[700],
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            title: Text(
+              name,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          title: Text(
-            name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            subtitle: Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             ),
-          ),
-          subtitle: Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           ),
         ),
       ),

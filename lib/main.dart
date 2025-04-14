@@ -53,10 +53,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _pagesPlaceholder = <Widget>[
-    DashboardScreen(),
-    SubjectsScreen(),
-    RankingsScreen(),
+  static final List<Widget> _pagesPlaceholder = <Widget>[
+    const DashboardScreen(),
+    const SubjectsScreen(),
+    RankingsScreen(toggleTheme: () {}), // Will be replaced in actual usage
     // The ProfileScreen needs the toggleTheme callback.
   ];
 
@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> pages = [
       const DashboardScreen(),
       const SubjectsScreen(),
-      const RankingsScreen(),
+      RankingsScreen(toggleTheme: widget.toggleTheme),
       ProfileScreen(toggleTheme: widget.toggleTheme),
     ];
     
