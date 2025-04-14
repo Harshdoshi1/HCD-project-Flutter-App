@@ -30,8 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  permission_handler: ^11.0.0
+  image_picker: ^1.0.7
   cupertino_icons: ^1.0.8
   fl_chart: ^0.66.2
+  glassmorphism: ^3.0.0
 
 dev_dependencies:
   flutter_test:
