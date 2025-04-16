@@ -36,14 +36,14 @@ class AppTheme {
   static ThemeData get lightTheme => ThemeData(
         brightness: Brightness.light,
         primaryColor: primaryColor,
-        scaffoldBackgroundColor: backgroundColor,
+        scaffoldBackgroundColor: Colors.white,
         colorScheme: const ColorScheme.light(
           primary: primaryColor,
           primaryContainer: primaryColorLight,
           secondary: secondaryColor,
           secondaryContainer: secondaryColorLight,
-          background: backgroundColor,
-          surface: surfaceColor,
+          background: Colors.white,
+          surface: Colors.white,
           onPrimary: onPrimaryColor,
           onSecondary: onSecondaryColor,
           onBackground: onBackgroundColor,

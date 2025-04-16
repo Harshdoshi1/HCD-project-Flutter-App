@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dashboard.dart';
+import 'main_navigation.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final VoidCallback? toggleTheme;
   
+  const LoginPage({super.key, this.toggleTheme});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -33,7 +35,7 @@ class _LoginPageState extends State<LoginPage> {
         // Navigate to dashboard screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const DashboardScreen(),
+            builder: (context) => MainNavigation(toggleTheme: widget.toggleTheme ?? () {}),
           ),
         );
       });

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:glassmorphism/glassmorphism.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'profile_screen.dart';
 import 'student_detail_screen.dart';
 
@@ -30,11 +31,43 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     'Harshvardhan Soni'
   ];
 
+  final List<String> academicSubtitles = [
+    'CGPA: 9.8 | Dept: ICT',
+    'CGPA: 9.7 | Dept: ICT',
+    'CGPA: 9.6 | Dept: ICT',
+    'CGPA: 9.5 | Dept: ICT',
+    'CGPA: 9.4 | Dept: ICT',
+    'CGPA: 9.3 | Dept: ICT',
+    'CGPA: 9.2 | Dept: ICT',
+    'CGPA: 9.1 | Dept: ICT',
+    'CGPA: 9.0 | Dept: ICT',
+  ];
+
+  final List<String> nonAcademicSubtitles = [
+    'Hackathons: 12 | Projects: 8',
+    'Hackathons: 10 | Projects: 9',
+    'Hackathons: 9 | Projects: 7',
+    'Hackathons: 8 | Projects: 8',
+    'Hackathons: 7 | Projects: 6',
+    'Hackathons: 6 | Projects: 7',
+    'Hackathons: 5 | Projects: 5',
+    'Hackathons: 4 | Projects: 6',
+    'Hackathons: 3 | Projects: 4',
+  ];
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _pageController = PageController();
+
+    _tabController.addListener(() {
+      _pageController.animateToPage(
+        _tabController.index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    });
 
     _fadeController = AnimationController(
       vsync: this,
@@ -56,25 +89,101 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      body: Column(
+      extendBodyBehindAppBar: true,
+      backgroundColor: isDark ? Colors.black : Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Rankings',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      ),
+      body: Stack(
         children: [
-          _buildHeader(),
-          Flexible(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  _tabController.animateTo(index);
-                },
-                children: [
-                  _buildAcademicRankings(),
-                  _buildNonAcademicRankings(),
+          // Gradient background
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF03A9F4),
+                  isDark ? Colors.black : Colors.white,
                 ],
+                stops: const [0.0, 0.3],
               ),
+            ),
+          ),
+          
+          SafeArea(
+            child: Column(
+              children: [
+                // Tab bar
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.05) 
+                        : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicator: BoxDecoration(
+                          borderRadius: BorderRadius.circular(25),
+                          color: isDark 
+                              ? Colors.white.withOpacity(0.1) 
+                              : Colors.black.withOpacity(0.1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF03A9F4).withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        dividerColor: Colors.transparent,
+                        labelColor: isDark ? Colors.white : Colors.black,
+                        unselectedLabelColor: isDark 
+                            ? Colors.white.withOpacity(0.6) 
+                            : Colors.black.withOpacity(0.6),
+                        tabs: const [
+                          Tab(text: 'Academic'),
+                          Tab(text: 'Non-Academic'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Page view
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      _tabController.animateTo(index);
+                    },
+                    children: [
+                      _buildRankingList(true),
+                      _buildRankingList(false),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -82,209 +191,147 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildHeader() {
-    return Stack(
-      children: [
-        // Background container
-        Container(
-          width: double.infinity,
-          height: kToolbarHeight + 80,
-          color: const Color(0xFF03A9F4),
-        ),
-        // Glassmorphic overlay
-        GlassmorphicContainer(
-          width: double.infinity,
-          height: kToolbarHeight + 80,
-          borderRadius: 0,
-          blur: 20,
-          alignment: Alignment.center,
-          border: 0,
-          linearGradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.1),
-              Colors.white.withOpacity(0.05),
-            ],
+  Widget _buildRankingList(bool isAcademic) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: studentNames.length,
+        itemBuilder: (context, index) {
+          final rank = index + 1;
+          final name = studentNames[index];
+          final subtitle = isAcademic ? academicSubtitles[index] : nonAcademicSubtitles[index];
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildStudentCard(rank, name, subtitle, isDark),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStudentCard(int rank, String name, String subtitle, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StudentDetailScreen(
+              name: name,
+              rank: '#$rank',
+              details: subtitle,
+            ),
           ),
-          borderGradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.05),
-              Colors.white.withOpacity(0.1),
-            ],
-          ),
-          child: SafeArea(
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark 
+                  ? Colors.white.withOpacity(0.1) 
+                  : Colors.black.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark 
+                    ? Colors.white.withOpacity(0.2) 
+                    : Colors.black.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  const Text(
-                    'Rankings',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  // Rank circle
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _getRankColor(rank).withOpacity(0.2),
+                      border: Border.all(
+                        color: _getRankColor(rank),
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$rank',
+                        style: TextStyle(
+                          color: _getRankColor(rank),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TabBar(
-                    isScrollable: true,
-                    controller: _tabController,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white70,
-                    indicator: const UnderlineTabIndicator(
-                      borderSide: BorderSide(width: 3, color: Colors.white),
-                      insets: EdgeInsets.symmetric(horizontal: 16),
+                  const SizedBox(width: 16),
+                  // Student details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: isDark 
+                                ? Colors.white.withOpacity(0.7) 
+                                : Colors.black.withOpacity(0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
-                    labelPadding: EdgeInsets.symmetric(horizontal: 24),
-                    onTap: (index) {
-                      _pageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    tabs: const [
-                      Tab(text: 'Academic'),
-                      Tab(text: 'Non-Academic'),
-                    ],
+                  ),
+                  // Arrow icon
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark 
+                          ? Colors.white.withOpacity(0.1) 
+                          : Colors.black.withOpacity(0.1),
+                    ),
+                    child: Icon(
+                      Icons.arrow_forward_ios,
+                      color: isDark ? Colors.white : Colors.black,
+                      size: 14,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildAcademicRankings() {
-    return _buildRankingsList(
-      title: 'Academic Rankings',
-      itemBuilder: (context, index) {
-        return _buildRankingCard(
-          rank: index + 1,
-          name: studentNames[index],
-          subtitle: 'SGPA: ${(9.5 - index * 0.2).toStringAsFixed(2)}',
-        );
-      },
-    );
-  }
-
-  Widget _buildNonAcademicRankings() {
-    final activities = ['Sports', 'Cultural', 'Technical', 'Social Service', 'Innovation'];
-    return _buildRankingsList(
-      title: 'Non-Academic Rankings',
-      itemBuilder: (context, index) {
-        return _buildRankingCard(
-          rank: index + 1,
-          name: studentNames[index],
-          subtitle: 'Top Activity: ${activities[index % activities.length]}',
-        );
-      },
-    );
-  }
-
-  Widget _buildRankingsList({
-    required String title,
-    required IndexedWidgetBuilder itemBuilder,
-  }) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 24),
-              itemCount: studentNames.length,
-              itemBuilder: itemBuilder,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRankingCard({required int rank, required String name, required String subtitle}) {
-    return GestureDetector(
-      onTap: () {
-        if (name == 'Harsh Doshi') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ProfileScreen(toggleTheme: widget.toggleTheme)),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => StudentDetailScreen(
-                name: name,
-                rank: rank.toString(),
-                details: subtitle,
-              ),
-            ),
-          );
-        }
-      },
-      child: GlassmorphicContainer(
-        width: double.infinity,
-        height: 90,
-        borderRadius: 12,
-        blur: 20,
-        alignment: Alignment.center,
-        border: 2,
-        linearGradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.1),
-            Colors.white.withOpacity(0.05),
-          ],
-        ),
-        borderGradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.05),
-            Colors.white.withOpacity(0.1),
-          ],
-        ),
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Center(
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: rank <= 3 ? Colors.amber : Colors.grey[700],
-              child: Text(
-                '$rank',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            title: Text(
-              name,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-            ),
-          ),
-        ),
       ),
     );
+  }
+
+  Color _getRankColor(int rank) {
+    if (rank == 1) {
+      return Colors.amber;
+    } else if (rank == 2) {
+      return Colors.grey.shade400;
+    } else if (rank == 3) {
+      return Colors.brown.shade300;
+    } else {
+      return const Color(0xFF03A9F4);
+    }
   }
 }

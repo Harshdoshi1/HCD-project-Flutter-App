@@ -5,7 +5,9 @@ import 'package:hac_flutter_hcd/models/subject.dart';
 import 'subject_detail_screen.dart';
 
 class SubjectsScreen extends StatefulWidget {
-  const SubjectsScreen({Key? key}) : super(key: key);
+  final VoidCallback toggleTheme;
+  
+  const SubjectsScreen({Key? key, required this.toggleTheme}) : super(key: key);
 
   @override
   State<SubjectsScreen> createState() => _SubjectsScreenState();
@@ -168,23 +170,24 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? Colors.black : Colors.white,
       body: Stack(
         children: [
           // Gradient background
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF03A9F4),
-                  Colors.black,
+                  const Color(0xFF03A9F4),
+                  isDark ? Colors.black : Colors.white,
                 ],
-                stops: [0.0, 0.3],
+                stops: const [0.0, 0.3],
               ),
             ),
           ),
@@ -203,10 +206,10 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
+                            Text(
                               'My Subjects',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: isDark ? Colors.white : Colors.black,
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -265,6 +268,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
 
   Widget _buildSemesterChip(int semester) {
     final isSelected = _selectedSemester == semester;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return GestureDetector(
       onTap: () {
@@ -277,20 +281,22 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected 
-              ? Colors.white.withOpacity(0.15) 
+              ? (isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected 
-                ? Colors.white.withOpacity(0.5) 
-                : Colors.white.withOpacity(0.2),
+                ? (isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5))
+                : (isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
             width: 1,
           ),
         ),
         child: Text(
           'Sem $semester',
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+            color: isSelected 
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
@@ -300,6 +306,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
 
   Widget _buildSubjectCard(Map<String, dynamic> subject, BuildContext context) {
     final String grade = subject['grade'] as String;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color gradeColor;
     
     // Determine grade color
@@ -338,10 +345,14 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: isDark 
+                    ? Colors.white.withOpacity(0.1) 
+                    : Colors.black.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: isDark 
+                      ? Colors.white.withOpacity(0.2) 
+                      : Colors.black.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -380,8 +391,8 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                         children: [
                           Text(
                             subject['name'],
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -390,7 +401,9 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                           Text(
                             subject['code'],
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: isDark 
+                                  ? Colors.white.withOpacity(0.7) 
+                                  : Colors.black.withOpacity(0.7),
                               fontSize: 14,
                             ),
                           ),
@@ -403,11 +416,13 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.1),
+                        color: isDark 
+                            ? Colors.white.withOpacity(0.1) 
+                            : Colors.black.withOpacity(0.1),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_forward_ios,
-                        color: Colors.white,
+                        color: isDark ? Colors.white : Colors.black,
                         size: 14,
                       ),
                     ),

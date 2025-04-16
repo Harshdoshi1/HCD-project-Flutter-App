@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'screens/dashboard.dart';
 import 'screens/profile_screen.dart';
 import 'screens/rankings_screen.dart';
 import 'screens/subjects_screen.dart';
 import 'constants/app_theme.dart';
-import 'package:glassmorphism/glassmorphism.dart';
+import 'screens/main_navigation.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   runApp(const MyApp());
 }
 
@@ -19,116 +25,37 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   
-  ThemeMode _themeMode = ThemeMode.dark;
+  bool _isDarkMode = true;
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _isDarkMode = !_isDarkMode;
     });
   }
 
   @override 
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Dashboard',
+      title: 'The Ictians',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: _themeMode,
-
-      home: HomeScreen(toggleTheme: _toggleTheme),
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  final VoidCallback toggleTheme;
-  const HomeScreen({Key? key, required this.toggleTheme}) : super(key: key);
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-// A simple bottom navigation layout for demonstration
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  static final List<Widget> _pagesPlaceholder = <Widget>[
-    const DashboardScreen(),
-    const SubjectsScreen(),
-    RankingsScreen(toggleTheme: () {}), 
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final List<Widget> pages = [
-      const DashboardScreen(),
-      const SubjectsScreen(),
-      RankingsScreen(toggleTheme: widget.toggleTheme),
-      ProfileScreen(toggleTheme: widget.toggleTheme),
-    ];
-    
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: ClipRRect(
-        child: GlassmorphicContainer(
-          width: MediaQuery.of(context).size.width,
-          height: 80,
-          borderRadius: 0,
-          blur: 20,
-          alignment: Alignment.center,
-          border: 0,
-          linearGradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.1),
-              Colors.white.withOpacity(0.05),
-            ],
-          ),
-          borderGradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.05),
-              Colors.white.withOpacity(0.1),
-            ],
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            selectedItemColor: Theme.of(context).colorScheme.primary,
-            unselectedItemColor: Theme.of(context).colorScheme.onSurface,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            onTap: (int index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard),
-                label: 'Dashboard',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.book),
-                label: 'Subjects',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.leaderboard),
-                label: 'Rankings',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
-          ),
-        ),
-      ),
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        // Handle navigation with arguments
+        if (settings.name == '/') {
+          // Extract the tab index from the arguments if provided
+          final tabIndex = settings.arguments as int?;
+          return MaterialPageRoute(
+            builder: (context) => MainNavigation(
+              toggleTheme: _toggleTheme,
+              initialTabIndex: tabIndex ?? 0,
+            ),
+          );
+        }
+        return null;
+      },
     );
   }
 }
