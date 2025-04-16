@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -17,8 +20,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   TextEditingController _nameController = TextEditingController();
   TextEditingController _emailController = TextEditingController();
   TextEditingController _bioController = TextEditingController();
+  
+  // Achievement controllers
+  TextEditingController _hackathonController = TextEditingController(text: 'Winner - CodeFest 2024');
+  TextEditingController _paperController = TextEditingController(text: 'IEEE Conference 2023');
+  TextEditingController _certificationController = TextEditingController(text: 'Google Cloud, AWS Solutions');
+  
   List<String> _skills = ['Flutter', 'Dart', 'UI/UX', 'Firebase'];
   String _newSkill = '';
+  File? _profileImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -39,6 +50,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   @override
   void dispose() {
     _fadeController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _bioController.dispose();
+    _hackathonController.dispose();
+    _paperController.dispose();
+    _certificationController.dispose();
     super.dispose();
   }
 
@@ -51,61 +68,128 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     ));
 
     final theme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.background,
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF03A9F4), // Consistent blue
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
         title: Text(
           'My Profile',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit),
+            icon: Icon(
+              _isEditing ? Icons.check : Icons.edit,
+              color: Colors.white,
+            ),
             onPressed: _toggleEditMode,
           ),
           IconButton(
-            icon: Icon(Icons.brightness_6, color: theme.onPrimary),
+            icon: Icon(
+              Icons.brightness_6,
+              color: Colors.white,
+            ),
             onPressed: widget.toggleTheme,
           ),
         ],
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                _buildProfileHeader(theme),
-                const SizedBox(height: 16),
-                _buildAnimatedInfoCard('Personal Information', [
-                  _buildEditableField('Name', _nameController, _isEditing, theme),
-                  _buildEditableField('Email', _emailController, _isEditing, theme),
-                  _buildInfoRow('Phone', '+91 9313670684', theme),
-                  _buildInfoRow('Batch', '2022-2026', theme),
-                ], theme),
-                _buildAnimatedInfoCard('Academic Information', [
-                  _buildInfoRow('Department', 'Information & Communication Technology', theme),
-                  _buildInfoRow('Semester', '6th', theme),
-                  _buildInfoRow('CGPA', '8.8', theme),
-                  _buildInfoRow('Rank', 'Top 10', theme),
-                  _buildInfoRow('Attendance', '85%', theme),
-                ], theme),
-                _buildAnimatedInfoCard('Skills', [
-                  if (_isEditing) _buildAddSkillField(),
-                  ..._skills.map((skill) => _buildSkillItem(skill, _isEditing, theme)).toList(),
-                ], theme),
-              ],
+      body: Stack(
+        children: [
+          // Gradient background
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF03A9F4),
+                  Colors.black,
+                ],
+                stops: [0.0, 0.3],
+              ),
             ),
           ),
-        ),
+          // Main content
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildProfileHeader(theme, isDark),
+                    const SizedBox(height: 24),
+                    _buildAnimatedInfoCard(
+                      'Personal Information',
+                      Icons.person,
+                      [
+                        _buildEditableField('Email', _emailController, _isEditing, theme, isDark),
+                        _buildInfoRow('Phone', '+91 9313670684', theme, isDark),
+                        _buildInfoRow('Batch', '2022-2026', theme, isDark),
+                      ],
+                      theme,
+                      isDark,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildAnimatedInfoCard(
+                      'Academic Information',
+                      Icons.school,
+                      [
+                        _buildInfoRow('Department', 'ICT', theme, isDark),
+                        _buildInfoRow('Semester', '6th', theme, isDark),
+                        _buildInfoRow('Lab Batch', 'A', theme, isDark),
+                        _buildInfoRow('CGPA', '8.8', theme, isDark),
+                        _buildInfoRow('Rank', 'Top 10', theme, isDark),
+                      ],
+                      theme,
+                      isDark,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildAnimatedInfoCard(
+                      'Achievements',
+                      Icons.emoji_events,
+                      [
+                        _buildEditableField('Hackathon', _hackathonController, _isEditing, theme, isDark),
+                        _buildEditableField('Paper Publication', _paperController, _isEditing, theme, isDark),
+                        _buildEditableField('Certifications', _certificationController, _isEditing, theme, isDark),
+                      ],
+                      theme,
+                      isDark,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildAnimatedInfoCard(
+                      'Skills',
+                      Icons.code,
+                      [
+                        if (_isEditing) _buildAddSkillField(isDark),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _skills.map((skill) => _buildSkillChip(skill, _isEditing, theme, isDark)).toList(),
+                        ),
+                      ],
+                      theme,
+                      isDark,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -119,98 +203,155 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     });
   }
 
-  Widget _buildProfileHeader(ColorScheme theme) {
+  Widget _buildProfileHeader(ColorScheme theme, bool isDark) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onTap: _isEditing ? _changeProfilePicture : null,
-          child: CircleAvatar(
-            radius: 50,
-            backgroundColor: theme.secondaryContainer,
-            child: Icon(Icons.person, size: 50, color: theme.onSecondaryContainer),
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 60,
+                backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+                backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                child: _profileImage == null
+                    ? Icon(
+                        Icons.person,
+                        size: 60,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      )
+                    : null,
+              ),
+              if (_isEditing)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.primary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(Icons.camera_alt, size: 20, color: Colors.white),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Text(
           'Harsh Doshi',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: theme.onBackground,
+            color: isDark ? Colors.white : Colors.black87,
           ),
         ),
         Text(
-          'ICT2025002',
+          '92200133002',
           style: TextStyle(
             fontSize: 16,
-            color: theme.onBackground.withOpacity(0.7),
+            color: isDark ? Colors.white70 : Colors.black54,
           ),
         ),
       ],
     );
   }
 
-  void _changeProfilePicture() {
-    // Implement photo change
+  Future<void> _changeProfilePicture() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _profileImage = File(image.path);
+      });
+    }
   }
 
-  Widget _buildAnimatedInfoCard(String title, List<Widget> children, ColorScheme theme) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: theme.primary,
-              ),
+  Widget _buildAnimatedInfoCard(String title, IconData icon, List<Widget> children, ColorScheme theme, bool isDark) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+              width: 1,
             ),
-            const Divider(),
-            ...children,
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black12 : Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ...children,
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, ColorScheme theme) {
+  Widget _buildInfoRow(String label, String value, ColorScheme theme, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: theme.onSurface,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white70 : Colors.black54,
             ),
           ),
-          Expanded(
-            flex: 6,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: theme.onSurface,
-              ),
-              textAlign: TextAlign.right,
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
         ],
@@ -218,61 +359,106 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildEditableField(String label, TextEditingController controller, bool enabled, ColorScheme theme) {
+  Widget _buildEditableField(String label, TextEditingController controller, bool isEditing, ColorScheme theme, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: theme.onSurface,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white70 : Colors.black54,
             ),
           ),
-          Expanded(
-            flex: 6,
-            child: enabled
-                ? TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+          const SizedBox(height: 6),
+          isEditing
+              ? TextField(
+                  controller: controller,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: true,
+                    fillColor: isDark ? Colors.black26 : Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.white24 : Colors.black12,
+                      ),
                     ),
-                  )
-                : Text(
-                    controller.text,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: theme.onSurface,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.white24 : Colors.black12,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: theme.primary,
+                        width: 1.5,
+                      ),
                     ),
                   ),
-          ),
+                )
+              : Text(
+                  controller.text,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildAddSkillField() {
+  Widget _buildAddSkillField(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Add new skill',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white54 : Colors.black38,
                 ),
+                isDense: true,
+                filled: true,
+                fillColor: isDark ? Colors.black26 : Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: Colors.blue,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
               ),
               onChanged: (value) => _newSkill = value,
               onSubmitted: (value) {
@@ -283,38 +469,69 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               },
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              if (_newSkill.isNotEmpty) {
-                setState(() => _skills.add(_newSkill));
-                _newSkill = '';
-              }
-            },
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.add, color: Colors.white),
+              onPressed: () {
+                if (_newSkill.isNotEmpty) {
+                  setState(() => _skills.add(_newSkill));
+                  _newSkill = '';
+                }
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSkillItem(String skill, bool isEditing, ColorScheme theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+  Widget _buildSkillChip(String skill, bool isEditing, ColorScheme theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.primary,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.code, size: 20, color: theme.onSurface),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              skill,
-              style: TextStyle(fontSize: 16, color: theme.onSurface),
+          Text(
+            skill,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          if (isEditing)
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => setState(() => _skills.remove(skill)),
+          if (isEditing) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => setState(() => _skills.remove(skill)),
+              child: const Icon(
+                Icons.close,
+                size: 16,
+                color: Colors.white70,
+              ),
             ),
+          ],
         ],
       ),
     );

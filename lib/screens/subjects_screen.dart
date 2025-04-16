@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:glassmorphism/glassmorphism.dart';
+import 'dart:ui';
 import 'package:hac_flutter_hcd/models/subject.dart';
 import 'subject_detail_screen.dart';
 
@@ -168,158 +168,255 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: Column(
+      backgroundColor: Colors.black,
+      body: Stack(
         children: [
-          Stack(
+          // Gradient background
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF03A9F4),
+                  Colors.black,
+                ],
+                stops: [0.0, 0.3],
+              ),
+            ),
+          ),
+          Column(
             children: [
+              // Header section
               Container(
                 width: double.infinity,
                 height: kToolbarHeight + 80,
-                color: const Color(0xFF03A9F4),
-              ),
-              GlassmorphicContainer(
-                width: double.infinity,
-                height: kToolbarHeight + 80,
-                borderRadius: 0,
-                blur: 20,
-                alignment: Alignment.center,
-                border: 0,
-                linearGradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withOpacity(0.1),
-                    Colors.white.withOpacity(0.05),
-                  ],
-                ),
-                borderGradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withOpacity(0.05),
-                    Colors.white.withOpacity(0.1),
-                  ],
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'My Subjects',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SlideTransition(
-                          position: _slideAnimation,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(semesters.length, (index) {
-                                final semester = index + 1;
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  child: ChoiceChip(
-                                    label: Text(
-                                      'Sem $semester',
-                                      style: TextStyle(
-                                        color: _selectedSemester == semester
-                                            ? Theme.of(context).colorScheme.onPrimary
-                                            : Theme.of(context).colorScheme.onBackground,
-                                      ),
-                                    ),
-                                    selected: _selectedSemester == semester,
-                                    selectedColor: Theme.of(context).colorScheme.primary,
-                                    backgroundColor: Theme.of(context).colorScheme.surface,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setState(() {
-                                          _selectedSemester = semester;
-                                        });
-                                      }
-                                    },
-                                  ),
-                                );
-                              }),
+                child: ClipRRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'My Subjects',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            SlideTransition(
+                              position: _slideAnimation,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List.generate(semesters.length, (index) {
+                                    final semester = index + 1;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: _buildSemesterChip(semester),
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Subject list
+              Expanded(
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: (_selectedSemester <= semesters.length)
+                          ? (semesters[_selectedSemester - 1]['subjects'] as List).length
+                          : 0,
+                      itemBuilder: (context, index) {
+                        if (_selectedSemester > semesters.length) return const SizedBox();
+                        final subjects = semesters[_selectedSemester - 1]['subjects'] as List;
+                        final subject = subjects[index] as Map<String, dynamic>;
+                        return _buildSubjectCard(subject, context);
+                      },
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          Expanded(
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: (_selectedSemester <= semesters.length)
-                      ? (semesters[_selectedSemester - 1]['subjects'] as List).length
-                      : 0,
-                  itemBuilder: (context, index) {
-                    if (_selectedSemester > semesters.length) return const SizedBox();
-                    final subjects = semesters[_selectedSemester - 1]['subjects'] as List;
-                    final subject = subjects[index] as Map<String, dynamic>;
-                    return Card(
-                      color: Theme.of(context).cardTheme.color, // Use theme's card color from cardTheme
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SubjectDetailScreen(
-                                subject: Subject(
-                                  name: subject['name'],
-                                  code: subject['code'],
-                                  status: subject['grade'] == 'A' || subject['grade'] == 'A+' || subject['grade'] == 'B+' ? 'Passed' : 'Failed',
-                                  grade: subject['grade'],
-                                  components: subject['components'],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        contentPadding: const EdgeInsets.all(16),
-                        title: Text(
-                          subject['name'],
-                          style: TextStyle(
-                            color: colorScheme.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Grade: ${subject['grade']}',
-                          style: TextStyle(color: colorScheme.onSurface),
-                        ),
-                        trailing: Icon(
-                          Icons.arrow_forward_ios,
-                          color: colorScheme.onSurface,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSemesterChip(int semester) {
+    final isSelected = _selectedSemester == semester;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedSemester = semester;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Colors.white.withOpacity(0.15) 
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected 
+                ? Colors.white.withOpacity(0.5) 
+                : Colors.white.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          'Sem $semester',
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubjectCard(Map<String, dynamic> subject, BuildContext context) {
+    final String grade = subject['grade'] as String;
+    Color gradeColor;
+    
+    // Determine grade color
+    if (grade == 'A+') {
+      gradeColor = Colors.green;
+    } else if (grade == 'A') {
+      gradeColor = Colors.lightGreen;
+    } else if (grade == 'B+') {
+      gradeColor = Colors.amber;
+    } else {
+      gradeColor = Colors.orange;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SubjectDetailScreen(
+                subject: Subject(
+                  name: subject['name'],
+                  code: subject['code'],
+                  status: subject['grade'] == 'A' || subject['grade'] == 'A+' || subject['grade'] == 'B+' ? 'Passed' : 'Failed',
+                  grade: subject['grade'],
+                  components: subject['components'],
+                ),
+              ),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Grade circle
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: gradeColor.withOpacity(0.2),
+                        border: Border.all(
+                          color: gradeColor,
+                          width: 2,
                         ),
                       ),
-                    );
-                  },
+                      child: Center(
+                        child: Text(
+                          grade,
+                          style: TextStyle(
+                            color: gradeColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Subject details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            subject['name'],
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subject['code'],
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Arrow icon
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
