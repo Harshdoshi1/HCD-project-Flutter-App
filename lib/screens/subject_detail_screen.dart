@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hac_flutter_hcd/models/subject.dart';
 import 'package:hac_flutter_hcd/screens/subjects_screen.dart';
 
 class SubjectDetailScreen extends StatelessWidget {

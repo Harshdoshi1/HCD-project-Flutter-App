@@ -18,7 +18,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Default to dark mode
+  
   ThemeMode _themeMode = ThemeMode.dark;
 
   void _toggleTheme() {
@@ -56,13 +56,11 @@ class _HomeScreenState extends State<HomeScreen> {
   static final List<Widget> _pagesPlaceholder = <Widget>[
     const DashboardScreen(),
     const SubjectsScreen(),
-    RankingsScreen(toggleTheme: () {}), // Will be replaced in actual usage
-    // The ProfileScreen needs the toggleTheme callback.
+    RankingsScreen(toggleTheme: () {}), 
   ];
 
   @override
   Widget build(BuildContext context) {
-    // Create a list of pages, including ProfileScreen with toggle callback.
     final List<Widget> pages = [
       const DashboardScreen(),
       const SubjectsScreen(),

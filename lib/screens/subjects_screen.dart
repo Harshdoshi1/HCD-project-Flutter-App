@@ -1,42 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:glassmorphism/glassmorphism.dart';
+import 'package:hac_flutter_hcd/models/subject.dart';
 import 'subject_detail_screen.dart';
-
-// In subjects_screen.dart
-class Subject {
-  final String name;
-  final String code;
-  final String status;
-  final String grade;
-  final Map<String, dynamic> components;
-
-  Subject({
-    required this.name,
-    required this.code,
-    required this.status,
-    required this.grade,
-    required this.components,
-  });
-
-  double get totalMarks => components.values.fold(
-        0, 
-        (sum, component) => sum + (component['marks'] ?? 0)
-      );
-
-  double get maxMarks => components.values.fold(
-        0, 
-        (sum, component) => sum + (component['outOf'] ?? 0)
-      );
-
-  double get percentage => maxMarks > 0 ? (totalMarks / maxMarks) * 100 : 0;
-
-  String get performanceLevel {
-    if (percentage >= 85) return 'Excellent';
-    if (percentage >= 70) return 'Good';
-    if (percentage >= 55) return 'Average';
-    return 'Needs Improvement';
-  }
-}
 
 class SubjectsScreen extends StatefulWidget {
   const SubjectsScreen({Key? key}) : super(key: key);
@@ -206,72 +172,94 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: colorScheme.background,
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 16,
-              bottom: 16,
-              left: 16,
-              right: 16,
-            ),
-            color: const Color(0xFF03A9F4), // Consistent blue
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: Center(
-                    child: Text(
-                      'My Subjects',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+          Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                height: kToolbarHeight + 80,
+                color: const Color(0xFF03A9F4),
+              ),
+              GlassmorphicContainer(
+                width: double.infinity,
+                height: kToolbarHeight + 80,
+                borderRadius: 0,
+                blur: 20,
+                alignment: Alignment.center,
+                border: 0,
+                linearGradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.05),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                SlideTransition(
-                  position: _slideAnimation,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
+                borderGradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.05),
+                    Colors.white.withOpacity(0.1),
+                  ],
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(semesters.length, (index) {
-                        final semester = index + 1;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: ChoiceChip(
-                            label: Text(
-                              'Sem $semester',
-                              style: TextStyle(
-                                color: _selectedSemester == semester
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.onBackground,
-                              ),
-                            ),
-                            selected: _selectedSemester == semester,
-                            selectedColor: Theme.of(context).colorScheme.primary,
-                            backgroundColor: Theme.of(context).colorScheme.surface,
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedSemester = semester;
-                                });
-                              }
-                            },
+                      children: [
+                        const Text(
+                          'My Subjects',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                      }),
+                        ),
+                        const SizedBox(height: 8),
+                        SlideTransition(
+                          position: _slideAnimation,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(semesters.length, (index) {
+                                final semester = index + 1;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      'Sem $semester',
+                                      style: TextStyle(
+                                        color: _selectedSemester == semester
+                                            ? Theme.of(context).colorScheme.onPrimary
+                                            : Theme.of(context).colorScheme.onBackground,
+                                      ),
+                                    ),
+                                    selected: _selectedSemester == semester,
+                                    selectedColor: Theme.of(context).colorScheme.primary,
+                                    backgroundColor: Theme.of(context).colorScheme.surface,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setState(() {
+                                          _selectedSemester = semester;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           Expanded(
             child: SlideTransition(
