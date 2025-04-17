@@ -45,12 +45,12 @@ class _MainNavigationState extends State<MainNavigation> {
       body: pages[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDark ? Colors.black : Colors.white,
+          color: Colors.transparent,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withOpacity(0.2),
               blurRadius: 10,
-              spreadRadius: 5,
+              spreadRadius: 0,
             ),
           ],
         ),
@@ -60,37 +60,50 @@ class _MainNavigationState extends State<MainNavigation> {
             topRight: Radius.circular(20),
           ),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-              backgroundColor: isDark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
-              selectedItemColor: const Color(0xFF03A9F4),
-              unselectedItemColor: isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
-              type: BottomNavigationBarType.fixed,
-              elevation: 0,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.dashboard),
-                  label: 'Dashboard',
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.book),
-                  label: 'Subjects',
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                  width: 0.5,
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.leaderboard),
-                  label: 'Rankings',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person),
-                  label: 'Profile',
-                ),
-              ],
+              ),
+              child: BottomNavigationBar(
+                currentIndex: _selectedIndex,
+                onTap: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
+                backgroundColor: Colors.transparent,
+                selectedItemColor: const Color(0xFF03A9F4),
+                unselectedItemColor: isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
+                type: BottomNavigationBarType.fixed,
+                elevation: 0,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.dashboard),
+                    label: 'Dashboard',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.book),
+                    label: 'Subjects',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.leaderboard),
+                    label: 'Rankings',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.person),
+                    label: 'Profile',
+                  ),
+                ],
+              ),
             ),
           ),
         ),

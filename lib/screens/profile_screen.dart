@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'splash_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -34,6 +36,40 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
 
+  // Save profile image path to shared preferences
+  Future<void> _saveProfileImagePath(String path) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail') ?? '';
+      if (userEmail.isNotEmpty) {
+        await prefs.setString('${userEmail}_profileImage', path);
+      }
+    } catch (e) {
+      debugPrint('Error saving profile image path: $e');
+    }
+  }
+  
+  // Load profile image from shared preferences
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail') ?? '';
+      if (userEmail.isNotEmpty) {
+        final imagePath = prefs.getString('${userEmail}_profileImage');
+        if (imagePath != null && imagePath.isNotEmpty) {
+          final file = File(imagePath);
+          if (await file.exists()) {
+            setState(() {
+              _profileImage = file;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading profile image: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,9 +81,62 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
     );
     _fadeController.forward();
-    _nameController.text = 'Harsh Doshi';
-    _emailController.text = 'harshdoshi@marwadinuiversity.ac.in';
     _bioController.text = 'Passionate developer with focus on creating beautiful mobile experiences';
+    
+    // Load user data from shared preferences
+    _loadUserData();
+    _loadProfileImage();
+  }
+  
+  Future<void> _loadUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail') ?? 'harshdoshi@marwadiuniversity.ac.in';
+      
+      setState(() {
+        _emailController.text = userEmail;
+        
+        // Extract name from email - only take alphabetic characters before @
+        if (userEmail.contains('@')) {
+          final emailParts = userEmail.split('@');
+          final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(emailParts[0]);
+          if (nameMatch != null && nameMatch.group(0) != null) {
+            String extractedName = nameMatch.group(0)!;
+            // Capitalize first letter
+            _nameController.text = extractedName[0].toUpperCase() + extractedName.substring(1);
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
+  
+  Future<void> _logout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', false);
+      
+      if (!mounted) return;
+      
+      // Navigate to splash screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => SplashScreen(toggleTheme: widget.toggleTheme),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      debugPrint('Error during logout: $e');
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logout failed: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -111,6 +200,48 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 widget.toggleTheme();
               } else if (value == 'about') {
                 _showAboutDialog(context);
+              } else if (value == 'logout') {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    backgroundColor: isDark ? Colors.black : Colors.white,
+                    title: Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    content: Text(
+                      'Are you sure you want to logout?',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _logout();
+                        },
+                        child: Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -133,6 +264,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 child: ListTile(
                   leading: Icon(Icons.info),
                   title: Text('About'),
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('Logout'),
                 ),
               ),
             ],
@@ -171,7 +309,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       [
                         _buildEditableField('Email', _emailController, _isEditing, theme, isDark),
                         _buildEditableField('Phone', _phoneController, _isEditing, theme, isDark),
-                        _buildInfoRow('Batch', '2022-2026', theme, isDark),
                       ],
                       theme,
                       isDark,
@@ -184,6 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         _buildInfoRow('Department', 'ICT', theme, isDark),
                         _buildInfoRow('Semester', '6th', theme, isDark),
                         _buildInfoRow('Lab Batch', 'A', theme, isDark),
+                        _buildInfoRow('Batch', '2022-2026', theme, isDark),
                         _buildInfoRow('CGPA', '8.8', theme, isDark),
                         _buildInfoRow('Rank', 'Top 10', theme, isDark),
                       ],
@@ -311,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         ),
         const SizedBox(height: 16),
         Text(
-          'Harsh Doshi',
+          _nameController.text,
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -335,6 +473,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       setState(() {
         _profileImage = File(image.path);
       });
+      // Save the profile image path
+      await _saveProfileImagePath(image.path);
     }
   }
 
@@ -865,91 +1005,98 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   void _showAboutDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? Colors.black 
-            : Colors.white,
-        title: Text(
-          'About The Ictians',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark 
-                ? Colors.white 
-                : Colors.black,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark 
+                  ? Colors.black.withOpacity(0.6) 
+                  : Colors.white.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark 
+                    ? Colors.white.withOpacity(0.2) 
+                    : Colors.black.withOpacity(0.1),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'About The Ictians',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'This app is designed and created by:',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Harsh Doshi',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Rishit Rathod',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Krish Mamtora',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Under guidance of Prof. CD Parmar sir',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'CLOSE',
+                        style: TextStyle(
+                          color: const Color(0xFF03A9F4),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'The Ictians is a student portal for ICT department students at Marwadi University.',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white70 
-                    : Colors.black87,
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Features:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white 
-                    : Colors.black,
-              ),
-            ),
-            SizedBox(height: 8),
-            _buildAboutFeature('Track academic performance'),
-            _buildAboutFeature('View upcoming events'),
-            _buildAboutFeature('Manage profile and skills'),
-            _buildAboutFeature('View subject details and grades'),
-            _buildAboutFeature('Check rankings and achievements'),
-            SizedBox(height: 16),
-            Text(
-              'Version 1.0.0',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white54 
-                    : Colors.black54,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: Text('Close'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAboutFeature(String feature) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle,
-            size: 16,
-            color: Color(0xFF03A9F4),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              feature,
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white70 
-                    : Colors.black87,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

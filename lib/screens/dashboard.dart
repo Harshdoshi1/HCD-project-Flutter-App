@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'profile_screen.dart';
 import '../constants/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -161,6 +162,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   ];
   
   late String _dailyQuote;
+  String _userName = 'User';
+
+  Future<void> _loadUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail') ?? '';
+      
+      if (userEmail.isNotEmpty) {
+        // Extract name from email - only take alphabetic characters before @
+        final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(userEmail.split('@').first);
+        if (nameMatch != null && nameMatch.group(0) != null) {
+          setState(() {
+            _userName = nameMatch.group(0)!;
+            // Capitalize first letter
+            _userName = _userName[0].toUpperCase() + _userName.substring(1);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -185,6 +208,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     
     // Set random daily quote
     _dailyQuote = _dailyQuotes[DateTime.now().day % _dailyQuotes.length];
+    
+    // Load user data from shared preferences
+    _loadUserData();
   }
 
   @override
@@ -240,7 +266,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             ),
                           ),
                           Text(
-                            'Harsh Doshi',
+                            _userName,
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -265,12 +291,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                       GestureDetector(
                         onTap: () {
-                          // Use the MainNavigation to switch to profile tab (index 3)
-                          Navigator.of(context).pushNamedAndRemoveUntil(
-                            '/',
-                            (route) => false,
-                            arguments: 3, // Profile tab index
-                          );
+                          setState(() {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(
+                                  toggleTheme: widget.toggleTheme,
+                                  isDarkMode: Theme.of(context).brightness == Brightness.dark,
+                                ),
+                              ),
+                            );
+                          });
                         },
                         child: Container(
                           decoration: BoxDecoration(
@@ -553,19 +583,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildProgrammingLanguagesChart() {
-    // Programming languages data
-    final List<Map<String, dynamic>> languageData = [
-      {'language': 'Dart', 'value': 95, 'color': Colors.blue},
-      {'language': 'Python', 'value': 88, 'color': Colors.green},
-      {'language': 'JS', 'value': 80, 'color': Colors.orange},
-      {'language': 'Java', 'value': 75, 'color': Colors.purple},
-      {'language': 'C++', 'value': 70, 'color': Colors.red},
-      {'language': 'C#', 'value': 65, 'color': Colors.teal},
-      {'language': 'C', 'value': 60, 'color': Colors.amber},
+    final languages = ['Dart', 'Python', 'JS', 'Java', 'C++', 'C#', 'C'];
+    final values = [95.0, 88.0, 80.0, 75.0, 70.0, 65.0, 60.0];
+    final colors = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.red,
+      Colors.teal,
+      Colors.amber,
     ];
-    
-    // Track touched section for hover effect
-    int? touchedIndex;
     
     return FadeTransition(
       opacity: CurvedAnimation(
@@ -574,64 +602,120 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
-        height: 240, // Reduced height to fit better in card
+        height: 240,
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: 0.0, end: 1.0),
           duration: const Duration(milliseconds: 1200),
           curve: Curves.easeOutCubic,
           builder: (context, value, child) {
-            return PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 30,
-                startDegreeOffset: 270, // Start from top
-                pieTouchData: PieTouchData(
-                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    setState(() {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        touchedIndex = -1;
-                        return;
-                      }
-                      touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                    });
-                  },
+            return BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: 100,
+                minY: 0,
+                barTouchData: BarTouchData(
                   enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    tooltipBgColor: Colors.black.withOpacity(0.8),
+                    tooltipPadding: const EdgeInsets.all(8),
+                    tooltipMargin: 8,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${languages[groupIndex]}: ${values[groupIndex].toInt()}%',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                sections: List.generate(languageData.length, (index) {
-                  final data = languageData[index];
-                  final isTouched = index == touchedIndex;
-                  final fontSize = isTouched ? 18.0 : 14.0;
-                  final radius = isTouched ? 90.0 : 80.0;
-                  
-                  return PieChartSectionData(
-                    color: data['color'],
-                    value: data['value'].toDouble() * value, // Animate value
-                    title: isTouched ? '${data['value']}%' : '',
-                    radius: radius,
-                    titleStyle: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value >= 0 && value < languages.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              languages[value.toInt()],
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox();
+                      },
+                      reservedSize: 30,
                     ),
-                    badgeWidget: Text(
-                      data['language'],
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        String text = '';
+                        if (value == 0) {
+                          text = '0';
+                        } else if (value == 5) {
+                          text = '5';
+                        } else if (value == 10) {
+                          text = '10';
+                        } else {
+                          return const SizedBox();
+                        }
+                        return Text(
+                          text,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                        );
+                      },
+                      reservedSize: 30,
+                    ),
+                  ),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                gridData: FlGridData(
+                  show: true,
+                  horizontalInterval: 20,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.white.withOpacity(0.1),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                barGroups: List.generate(languages.length, (index) {
+                  return BarChartGroupData(
+                    x: index,
+                    barRods: [
+                      BarChartRodData(
+                        toY: values[index] * value,
+                        color: colors[index],
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                        backDrawRodData: BackgroundBarChartRodData(
+                          show: true,
+                          toY: 100,
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
-                    ),
-                    badgePositionPercentageOffset: .8,
+                    ],
                   );
                 }),
               ),
               swapAnimationDuration: const Duration(milliseconds: 750),
               swapAnimationCurve: Curves.easeInOutQuint,
             );
-          }
+          },
         ),
       ),
     );
@@ -643,61 +727,181 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       padding: const EdgeInsets.symmetric(horizontal: 10), // Added horizontal padding
       itemBuilder: (context, index) {
         final event = events[index];
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-                  width: 1,
-                ),
-              ),
-              child: ListTile(
-                dense: true,
-                visualDensity: VisualDensity.compact,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Added padding
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: (event['color'] as Color).withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    event['icon'],
-                    color: (event['color'] as Color),
-                    size: 20,
+        return GestureDetector(
+          onTap: () {
+            _showEventDetails(context, event);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
+                    width: 1,
                   ),
                 ),
-                title: Text(
-                  event['title'],
-                  style: TextStyle(
+                child: ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Added padding
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (event['color'] as Color).withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      event['icon'],
+                      color: (event['color'] as Color),
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    event['title'],
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: Text(
+                    event['date'],
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.arrow_forward_ios,
                     color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    size: 14,
                   ),
-                ),
-                subtitle: Text(
-                  event['date'],
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-                    fontSize: 12,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                  size: 14,
                 ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showEventDetails(BuildContext context, Map<String, dynamic> event) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAcademic = academicEvents.contains(event);
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: (event['color'] as Color).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          event['icon'],
+                          color: event['color'] as Color,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              event['title'],
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              event['date'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark ? Colors.white70 : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isAcademic ? 'Marks' : 'Points',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          isAcademic ? '50 marks' : '100 points',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF03A9F4),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -819,6 +1023,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _showClubDetails(BuildContext context, Map<String, dynamic> club) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -834,13 +1040,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: Container(
               height: MediaQuery.of(context).size.height * 0.6,
               decoration: BoxDecoration(
-                color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.8) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.8) : Colors.black.withOpacity(0.8)),
+                color: isDark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),
                 ),
                 border: Border.all(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
+                  color: isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -856,7 +1062,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         end: Alignment.bottomRight,
                         colors: [
                           (club['color'] as Color).withOpacity(0.4),
-                          Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+                          isDark ? Colors.black.withOpacity(0.1) : Colors.white.withOpacity(0.1),
                         ],
                       ),
                     ),
@@ -882,7 +1088,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               Text(
                                 club['name'],
                                 style: TextStyle(
-                                  color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                                  color: isDark ? Colors.white : Colors.black87,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 20,
                                 ),
@@ -915,7 +1121,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   Text(
                                     'Code: ${club['code']}',
                                     style: TextStyle(
-                                      color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
+                                      color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -946,7 +1152,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Text(
                             club['description'],
                             style: TextStyle(
-                              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
+                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
                               fontSize: 14,
                             ),
                           ),
@@ -981,7 +1187,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Text(
                             club['role'],
                             style: TextStyle(
-                              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
+                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
                               fontSize: 14,
                             ),
                           ),
@@ -1068,7 +1274,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
+              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black87),
             ),
           ),
           Text(
@@ -1130,76 +1336,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildAnimatedRadarChart() {
-    // Subject names and scores with adjusted positions to prevent overlap
-    final List<String> subjects = ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'];
-    final List<double> scores = [85, 78, 92, 88, 75, 82];
-    
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: _graphAnimationController,
-        curve: Curves.easeIn,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Custom radar chart visualization
-            Expanded(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0.0, end: 1.0),
-                duration: const Duration(milliseconds: 1500),
-                curve: Curves.elasticOut,
-                builder: (context, value, child) {
-                  return CustomPaint(
-                    size: const Size(double.infinity, double.infinity),
-                    painter: RadarChartPainter(
-                      subjects: subjects,
-                      scores: scores.map((score) => score * value).toList(),
-                      maxScore: 100,
-                      backgroundColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.05) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
-                      lineColor: Colors.blue,
-                      fillColor: Colors.blue.withOpacity(0.2),
-                      labelOffset: const [0.0, -0.1, 0.0, 0.1, 0.0, 0.0], // Adjust OT and AWT positions
-                      context: context,
-                    ),
-                  );
-                },
-              ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedBuilder(
+      animation: _graphAnimationController,
+      builder: (context, child) {
+        return SizedBox(
+          height: 200, // Decreased from 220 to make it even smaller
+          child: CustomPaint(
+            painter: RadarChartPainter(
+              subjects: ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'],
+              scores: [
+                85 * _graphAnimationController.value,
+                75 * _graphAnimationController.value,
+                90 * _graphAnimationController.value,
+                80 * _graphAnimationController.value,
+                70 * _graphAnimationController.value,
+                85 * _graphAnimationController.value,
+              ],
+              maxScore: 100,
+              backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
+              lineColor: const Color(0xFF03A9F4),
+              fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
+              context: context,
             ),
-            
-            // Legend
-            Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: List.generate(
-                subjects.length,
-                (index) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${subjects[index]}: ${scores[index].toInt()}%',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+            size: const Size(double.infinity, 200), // Decreased from 220 to make it even smaller
+          ),
+        );
+      },
     );
   }
 
@@ -1218,10 +1381,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
               maxY: 10,
+              minY: 0,
               barTouchData: BarTouchData(
                 enabled: true,
                 touchTooltipData: BarTouchTooltipData(
-                  tooltipBgColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.8) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.8) : Colors.black.withOpacity(0.8)),
+                  tooltipBgColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.8) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.8) : Colors.black87),
                   tooltipPadding: const EdgeInsets.all(8),
                   tooltipMargin: 8,
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -1251,7 +1415,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     return BarTooltipItem(
                       '$semester\n',
                       TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                        color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -1305,7 +1469,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         child: Text(
                           text,
                           style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                            color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -1318,7 +1482,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    getTitlesWidget: (double value, TitleMeta meta) {
+                    getTitlesWidget: (value, meta) {
                       String text = '';
                       if (value == 0) {
                         text = '0';
@@ -1327,15 +1491,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       } else if (value == 10) {
                         text = '10.0';
                       }
-                      return SideTitleWidget(
-                        axisSide: meta.axisSide,
-                        space: 8,
-                        child: Text(
-                          text,
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                            fontSize: 10,
-                          ),
+                      return Text(
+                        text,
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+                          fontSize: 10,
                         ),
                       );
                     },
@@ -1353,11 +1513,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 show: true,
                 horizontalInterval: 2.5,
                 getDrawingHorizontalLine: (value) => FlLine(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black87),
                   strokeWidth: 1,
                 ),
                 getDrawingVerticalLine: (value) => FlLine(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black87),
                   strokeWidth: 1,
                 ),
               ),
@@ -1391,7 +1551,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           backDrawRodData: BackgroundBarChartRodData(
             show: true,
             toY: 10,
-            color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+            color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black87),
           ),
         ),
       ],
@@ -1500,8 +1660,9 @@ class RadarChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.4;
+    final radius = size.width * 0.35; // Decreased from 0.4
     
     // Draw background
     canvas.drawCircle(center, radius, Paint()..color = backgroundColor);
@@ -1513,7 +1674,7 @@ class RadarChartPainter extends CustomPainter {
         center,
         circleRadius,
         Paint()
-          ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1))
+          ..color = isDark ? Colors.white.withOpacity(0.1) : Colors.black87
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1,
       );
@@ -1559,7 +1720,7 @@ class RadarChartPainter extends CustomPainter {
       final dy = center.dy + radius * math.sin(angle);
       
       canvas.drawLine(center, Offset(dx, dy), Paint()
-        ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3))
+        ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black87)
         ..strokeWidth = 1);
       
       // Draw subject labels with offset adjustment if provided
@@ -1581,7 +1742,7 @@ class RadarChartPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: subjects[i],
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+          color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -1599,7 +1760,7 @@ class RadarChartPainter extends CustomPainter {
     
     // Draw points
     for (final point in points) {
-      canvas.drawCircle(point, 4, Paint()..color = Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black));
+      canvas.drawCircle(point, 4, Paint()..color = Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87));
       canvas.drawCircle(point, 3, Paint()..color = lineColor);
     }
   }

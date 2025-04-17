@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'screens/dashboard.dart';
-import 'screens/profile_screen.dart';
-import 'screens/rankings_screen.dart';
-import 'screens/subjects_screen.dart';
 import 'constants/app_theme.dart';
-import 'screens/main_navigation.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,21 +37,7 @@ class _MyAppState extends State<MyApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      initialRoute: '/',
-      onGenerateRoute: (settings) {
-        // Handle navigation with arguments
-        if (settings.name == '/') {
-          // Extract the tab index from the arguments if provided
-          final tabIndex = settings.arguments as int?;
-          return MaterialPageRoute(
-            builder: (context) => MainNavigation(
-              toggleTheme: _toggleTheme,
-              initialTabIndex: tabIndex ?? 0,
-            ),
-          );
-        }
-        return null;
-      },
+      home: SplashScreen(toggleTheme: _toggleTheme),
     );
   }
 }

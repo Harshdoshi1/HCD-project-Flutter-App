@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="hac_flutter_hcd"
+        android:label="The Ictians"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

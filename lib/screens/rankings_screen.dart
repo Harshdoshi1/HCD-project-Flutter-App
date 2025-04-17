@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
-import 'profile_screen.dart';
 import 'student_detail_screen.dart';
 
 class RankingsScreen extends StatefulWidget {
@@ -18,6 +17,8 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   late PageController _pageController;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   final List<String> studentNames = [
     'Harsh Doshi',
@@ -32,27 +33,27 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   ];
 
   final List<String> academicSubtitles = [
-    'CGPA: 9.8 | Dept: ICT',
-    'CGPA: 9.7 | Dept: ICT',
-    'CGPA: 9.6 | Dept: ICT',
-    'CGPA: 9.5 | Dept: ICT',
-    'CGPA: 9.4 | Dept: ICT',
-    'CGPA: 9.3 | Dept: ICT',
-    'CGPA: 9.2 | Dept: ICT',
-    'CGPA: 9.1 | Dept: ICT',
-    'CGPA: 9.0 | Dept: ICT',
+    'SGPA: 9.8 | Sem: 5th',
+    'SGPA: 9.7 | Sem: 5th',
+    'SGPA: 9.6 | Sem: 5th',
+    'SGPA: 9.5 | Sem: 5th',
+    'SGPA: 9.4 | Sem: 5th',
+    'SGPA: 9.3 | Sem: 5th',
+    'SGPA: 9.2 | Sem: 5th',
+    'SGPA: 9.1 | Sem: 5th',
+    'SGPA: 9.0 | Sem: 5th',
   ];
 
   final List<String> nonAcademicSubtitles = [
-    'Hackathons: 12 | Projects: 8',
-    'Hackathons: 10 | Projects: 9',
-    'Hackathons: 9 | Projects: 7',
-    'Hackathons: 8 | Projects: 8',
-    'Hackathons: 7 | Projects: 6',
-    'Hackathons: 6 | Projects: 7',
-    'Hackathons: 5 | Projects: 5',
-    'Hackathons: 4 | Projects: 6',
-    'Hackathons: 3 | Projects: 4',
+    'Points: 1200',
+    'Points: 1100',
+    'Points: 950',
+    'Points: 900',
+    'Points: 850',
+    'Points: 800',
+    'Points: 750',
+    'Points: 700',
+    'Points: 650',
   ];
 
   @override
@@ -84,6 +85,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     _tabController.dispose();
     _pageController.dispose();
     _fadeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -129,7 +131,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
               children: [
                 // Tab bar
                 Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   height: 45,
                   decoration: BoxDecoration(
                     color: isDark 
@@ -170,6 +172,73 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
                   ),
                 ),
                 
+                // Search bar
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.05) 
+                        : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: isDark 
+                          ? Colors.white.withOpacity(0.1) 
+                          : Colors.black.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.toLowerCase();
+                          });
+                        },
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search students...',
+                          hintStyle: TextStyle(
+                            color: isDark 
+                                ? Colors.white.withOpacity(0.5) 
+                                : Colors.black.withOpacity(0.5),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: isDark 
+                                ? Colors.white.withOpacity(0.5) 
+                                : Colors.black.withOpacity(0.5),
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: isDark 
+                                        ? Colors.white.withOpacity(0.5) 
+                                        : Colors.black.withOpacity(0.5),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                
                 // Page view
                 Expanded(
                   child: PageView(
@@ -194,22 +263,46 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   Widget _buildRankingList(bool isAcademic) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    // Filter students based on search query
+    List<int> filteredIndices = [];
+    for (int i = 0; i < studentNames.length; i++) {
+      if (_searchQuery.isEmpty || 
+          studentNames[i].toLowerCase().contains(_searchQuery) ||
+          (isAcademic && academicSubtitles[i].toLowerCase().contains(_searchQuery)) ||
+          (!isAcademic && nonAcademicSubtitles[i].toLowerCase().contains(_searchQuery))) {
+        filteredIndices.add(i);
+      }
+    }
+    
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: studentNames.length,
-        itemBuilder: (context, index) {
-          final rank = index + 1;
-          final name = studentNames[index];
-          final subtitle = isAcademic ? academicSubtitles[index] : nonAcademicSubtitles[index];
-          
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildStudentCard(rank, name, subtitle, isDark),
-          );
-        },
-      ),
+      child: filteredIndices.isEmpty
+          ? Center(
+              child: Text(
+                'No students found',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black54,
+                  fontSize: 16,
+                ),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: filteredIndices.length,
+              itemBuilder: (context, index) {
+                final originalIndex = filteredIndices[index];
+                final rank = originalIndex + 1;
+                final name = studentNames[originalIndex];
+                final subtitle = isAcademic 
+                    ? academicSubtitles[originalIndex] 
+                    : nonAcademicSubtitles[originalIndex];
+                
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildStudentCard(rank, name, subtitle, isDark),
+                );
+              },
+            ),
     );
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
-import 'package:hac_flutter_hcd/models/subject.dart';
+import '../models/subject.dart';
 import 'subject_detail_screen.dart';
 
 class SubjectsScreen extends StatefulWidget {
@@ -81,7 +81,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
           'code': 'EC201',
           'grade': 'A+',
           'components': {
-            'IA': {'marks': 29, 'outOf': 30},
+            'IA': {'marks': 9, 'outOf': 30},
             'Viva': {'marks': 24, 'outOf': 25},
             'Assignment': {'marks': 24, 'outOf': 25},
             'CSE': {'marks': 19, 'outOf': 20},
