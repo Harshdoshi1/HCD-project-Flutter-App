@@ -211,7 +211,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         FadeTransition(
                           opacity: _fadeAnimation,
                           child: const Text(
-                            'The Ictians',
+                            'Icitians',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.bold,

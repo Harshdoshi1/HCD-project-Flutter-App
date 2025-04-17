@@ -187,7 +187,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                       const SizedBox(height: 24),
                       const Text(
-                        'The Ictians',
+                        'Icitians',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 28,
@@ -420,7 +420,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       
                       // App Info
                       Text(
-                        'The Ictians App v1.0',
+                        'Icitians App v1.0',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,

@@ -32,7 +32,7 @@ class _MyAppState extends State<MyApp> {
   @override 
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'The Ictians',
+      title: 'Icitians',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

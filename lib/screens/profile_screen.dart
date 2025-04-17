@@ -307,7 +307,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       'Personal Information',
                       Icons.person,
                       [
-                        _buildEditableField('Email', _emailController, _isEditing, theme, isDark),
+                        _buildEditableField('Email', _emailController, _isEditing, theme, isDark, editable: false),
                         _buildEditableField('Phone', _phoneController, _isEditing, theme, isDark),
                       ],
                       theme,
@@ -324,6 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         _buildInfoRow('Batch', '2022-2026', theme, isDark),
                         _buildInfoRow('CGPA', '8.8', theme, isDark),
                         _buildInfoRow('Rank', 'Top 10', theme, isDark),
+                        _buildInfoRow('Internship', 'Example 1', theme, isDark),
                       ],
                       theme,
                       isDark,
@@ -448,14 +449,34 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-        Text(
-          _nameController.text,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
+        _isEditing 
+            ? TextField(
+                controller: _nameController,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                    ),
+                  ),
+                ),
+              )
+            : Text(
+                _nameController.text,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
         Text(
           '92200133002',
           style: TextStyle(
@@ -566,7 +587,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildEditableField(String label, TextEditingController controller, bool isEditing, ColorScheme theme, bool isDark) {
+  Widget _buildEditableField(String label, TextEditingController controller, bool isEditing, ColorScheme theme, bool isDark, {bool editable = true}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -581,7 +602,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ),
           ),
           const SizedBox(height: 6),
-          isEditing
+          isEditing && editable
               ? TextField(
                   controller: controller,
                   style: TextStyle(
@@ -1034,7 +1055,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'About The Ictians',
+                    'About Icitians',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -1049,6 +1070,22 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     ),
                   ),
                   const SizedBox(height: 8),
+                  Text(
+                    'Harsh Doshi',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'This is our HCD project created by Team Student performance Analyizer',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      // fontStyle: FontStyle.italic,
+                    ),
+                  ),
+        const SizedBox(height: 8),
                   Text(
                     'Harsh Doshi',
                     style: TextStyle(
@@ -1072,7 +1109,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Under guidance of Prof. CD Parmar sir',
+                    'Under The mentoring and guidance of Prof. CD Parmar sir',
                     style: TextStyle(
                       color: isDark ? Colors.white70 : Colors.black87,
                       fontStyle: FontStyle.italic,

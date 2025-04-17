@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:io';
 import 'profile_screen.dart';
 import '../constants/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -313,14 +314,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               ),
                             ],
                           ),
-                          child: CircleAvatar(
-                            radius: 24,
-                            backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
-                            child: Icon(
-                              Icons.person,
-                              color: Theme.of(context).textTheme.bodyLarge!.color,
-                              size: 32,
-                            ),
+                          child: FutureBuilder<SharedPreferences>(
+                            future: SharedPreferences.getInstance(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data != null) {
+                                final prefs = snapshot.data!;
+                                final userEmail = prefs.getString('userEmail') ?? '';
+                                final imagePath = prefs.getString('${userEmail}_profileImage');
+                                
+                                if (imagePath != null && imagePath.isNotEmpty) {
+                                  final file = File(imagePath);
+                                  return CircleAvatar(
+                                    radius: 24,
+                                    backgroundImage: FileImage(file),
+                                  );
+                                }
+                              }
+                              
+                              return CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                                child: Icon(
+                                  Icons.person,
+                                  color: Theme.of(context).textTheme.bodyLarge!.color,
+                                  size: 32,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -839,7 +859,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black87,
+                                color: isDark ? Colors.white : Colors.black,
                               ),
                             ),
                             Text(
@@ -1088,7 +1108,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               Text(
                                 club['name'],
                                 style: TextStyle(
-                                  color: isDark ? Colors.white : Colors.black87,
+                                  color: isDark ? Colors.white : Colors.black,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 20,
                                 ),
@@ -1121,7 +1141,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   Text(
                                     'Code: ${club['code']}',
                                     style: TextStyle(
-                                      color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
+                                      color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
                                       fontSize: 12,
                                     ),
                                   ),
@@ -1140,10 +1160,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Description',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -1152,15 +1172,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Text(
                             club['description'],
                             style: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
+                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
                               fontSize: 14,
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Text(
+                          Text(
                             'Club Link',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -1175,10 +1195,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Text(
+                          Text(
                             'Your Role',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -1187,7 +1207,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Text(
                             club['role'],
                             style: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
+                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
                               fontSize: 14,
                             ),
                           ),
@@ -1232,25 +1252,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.info_outline,
+                        Icons.dashboard,
                         size: 18,
-                        color: Color(0xFF03A9F4),
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Text(
                       'Overview',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 _buildInfoRow('Current CGPA', '8.8'),
-                _buildInfoRow('Completed Credits', '120/180'),
                 _buildInfoRow('Current Semester', '6th'),
                 _buildInfoRow('Academic Rank', '5th'),
                 _buildInfoRow('Non-Academic Rank', '3rd'),
@@ -1274,15 +1293,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black87),
+              color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white.withOpacity(0.7) 
+                : Colors.black.withOpacity(0.7),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white 
+                : Colors.black,
             ),
           ),
         ],
@@ -1341,25 +1364,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       animation: _graphAnimationController,
       builder: (context, child) {
         return SizedBox(
-          height: 200, // Decreased from 220 to make it even smaller
+          height: 150, // Decreased from 200 to make it even smaller
           child: CustomPaint(
             painter: RadarChartPainter(
               subjects: ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'],
               scores: [
                 85 * _graphAnimationController.value,
                 75 * _graphAnimationController.value,
-                90 * _graphAnimationController.value,
                 80 * _graphAnimationController.value,
                 70 * _graphAnimationController.value,
+                65 * _graphAnimationController.value,
                 85 * _graphAnimationController.value,
               ],
               maxScore: 100,
               backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
               lineColor: const Color(0xFF03A9F4),
               fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
+              colors: [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.teal],
               context: context,
             ),
-            size: const Size(double.infinity, 200), // Decreased from 220 to make it even smaller
+            size: const Size(double.infinity, 150), // Decreased from 200 to make it even smaller
           ),
         );
       },
@@ -1385,7 +1409,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               barTouchData: BarTouchData(
                 enabled: true,
                 touchTooltipData: BarTouchTooltipData(
-                  tooltipBgColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.8) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.8) : Colors.black87),
+                  tooltipBgColor: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
                   tooltipPadding: const EdgeInsets.all(8),
                   tooltipMargin: 8,
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -1415,7 +1439,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     return BarTooltipItem(
                       '$semester\n',
                       TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -1423,7 +1447,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         TextSpan(
                           text: '${(rod.toY * value).toStringAsFixed(1)}',
                           style: TextStyle(
-                            color: Colors.yellow,
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.yellow : Colors.blue,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -1525,9 +1549,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 show: false,
               ),
               barGroups: [
-                _buildBarGroup(0, 8.2 * value),
+                _buildBarGroup(0, 6.5 * value),
                 _buildBarGroup(1, 8.5 * value),
-                _buildBarGroup(2, 7.8 * value),
+                _buildBarGroup(2, 2.9 * value),
                 _buildBarGroup(3, 9.1 * value),
                 _buildBarGroup(4, 8.9 * value),
                 _buildBarGroup(5, 9.3 * value),
@@ -1540,12 +1564,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   BarChartGroupData _buildBarGroup(int x, double y) {
+    // Define colors based on SGPA value
+    Color getBarColor(double sgpa) {
+      if (sgpa >= 7.0) return Colors.green;
+      if (sgpa >= 4.0) return Colors.orange;
+      return Colors.red;
+    }
+
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
           toY: y,
-          color: Colors.blue,
+          color: getBarColor(y),
           width: 22,
           borderRadius: BorderRadius.circular(4),
           backDrawRodData: BackgroundBarChartRodData(
@@ -1644,7 +1675,7 @@ class RadarChartPainter extends CustomPainter {
   final Color backgroundColor;
   final Color lineColor;
   final Color fillColor;
-  final List<double>? labelOffset;
+  final List<Color>? colors;
   final BuildContext context;
 
   RadarChartPainter({
@@ -1654,7 +1685,7 @@ class RadarChartPainter extends CustomPainter {
     required this.backgroundColor,
     required this.lineColor,
     required this.fillColor,
-    this.labelOffset,
+    this.colors,
     required this.context,
   });
 
@@ -1727,8 +1758,8 @@ class RadarChartPainter extends CustomPainter {
       double offsetX = 0;
       double offsetY = 0;
       
-      if (labelOffset != null && i < labelOffset!.length) {
-        offsetX = radius * 0.2 * labelOffset![i];
+      if (colors != null && i < colors!.length) {
+        offsetX = radius * 0.2 * 0.5;
       }
       
       final labelDx = center.dx + (radius + 20) * math.cos(angle) + offsetX;
@@ -1742,7 +1773,7 @@ class RadarChartPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: subjects[i],
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+          color: colors != null ? colors![i] : Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
