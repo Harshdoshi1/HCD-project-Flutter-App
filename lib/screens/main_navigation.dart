@@ -35,10 +35,7 @@ class _MainNavigationState extends State<MainNavigation> {
       DashboardScreen(toggleTheme: widget.toggleTheme),
       SubjectsScreen(toggleTheme: widget.toggleTheme),
       RankingsScreen(toggleTheme: widget.toggleTheme),
-      ProfileScreen(
-        toggleTheme: widget.toggleTheme,
-        isDarkMode: isDark,
-      ),
+      ProfileScreen(toggleTheme: widget.toggleTheme),
     ];
 
     return Scaffold(

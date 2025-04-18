@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/user_provider.dart';
 import 'main_navigation.dart';
+import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback? toggleTheme;
@@ -17,9 +20,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  final _authService = AuthService();
   
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _enrollmentController = TextEditingController();
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -53,69 +57,214 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   void dispose() {
     _animationController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
+    _enrollmentController.dispose();
     super.dispose();
   }
 
   Future<void> _performLogin() async {
-    if (_formKey.currentState?.validate() ?? false) {
+    if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
-      
+
       try {
-        // Extract name from email (everything before @)
-        final email = _emailController.text.trim();
-        final name = email.split('@')[0];
-        final formattedName = name.split('.').map((part) => 
-          part.isNotEmpty ? part[0].toUpperCase() + part.substring(1) : ''
-        ).join(' ');
-        
-        // Save login session
+        final response = await _authService.login(
+          _emailController.text,
+          _enrollmentController.text,
+          context,
+        );
+
+        if (!mounted) return;
+
+        // Save user data to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
-        await prefs.setString('userEmail', email);
-        await prefs.setString('userName', formattedName);
-        
-        // Simulate a login delay of 1 second
-        await Future.delayed(const Duration(seconds: 1));
-        
-        if (!mounted) return; // Ensure widget is still in the tree
+        await prefs.setString('token', response['token']);
         
         setState(() {
           _isLoading = false;
         });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Navigate to dashboard screen
-        Navigator.of(context).pushReplacement(
+
+        // Navigate to main screen
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
           MaterialPageRoute(
             builder: (context) => MainNavigation(
-              toggleTheme: widget.toggleTheme ?? () {},
               initialTabIndex: 0,
+              toggleTheme: widget.toggleTheme ?? () {},
             ),
           ),
         );
       } catch (e) {
-        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
-        
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
+            content: Text(e.toString()),
             backgroundColor: Colors.red,
           ),
         );
       }
     }
+  }
+
+  Widget _buildForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Login',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Email Field
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Email',
+              hintText: 'youremail@marwadieducation.edu.in',
+              prefixIcon: const Icon(Icons.email_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.white.withOpacity(0.3) 
+                    : Colors.black.withOpacity(0.3),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF03A9F4),
+                  width: 2,
+                ),
+              ),
+              labelStyle: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.7) 
+                  : Colors.black.withOpacity(0.7),
+              ),
+              hintStyle: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.3) 
+                  : Colors.black.withOpacity(0.3),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your email';
+              }
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                return 'Please enter a valid email';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          
+          // Enrollment Number Field
+          TextFormField(
+            controller: _enrollmentController,
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Enrollment Number',
+              prefixIcon: Icon(
+                Icons.numbers,
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              labelStyle: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your enrollment number';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 8),
+          
+          // Forgot Password
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                // Show forgot password dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password reset functionality will be implemented in future updates'),
+                  ),
+                );
+              },
+              child: const Text(
+                'Forgot Password?',
+                style: TextStyle(
+                  color: Color(0xFF03A9F4),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Login Button
+          SizedBox(
+            height: 55,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _performLogin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF03A9F4),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'LOGIN',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -225,193 +374,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   : Colors.black.withOpacity(0.1),
                               ),
                             ),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Login',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.white : Colors.black,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  
-                                  // Email Field
-                                  TextFormField(
-                                    controller: _emailController,
-                                    keyboardType: TextInputType.emailAddress,
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white : Colors.black,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: 'Email',
-                                      hintText: 'youremail@marwadiuniversity.ac.in',
-                                      prefixIcon: const Icon(Icons.email, color: Color(0xFF03A9F4)),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                          color: isDark 
-                                            ? Colors.white.withOpacity(0.3) 
-                                            : Colors.black.withOpacity(0.3),
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF03A9F4),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      labelStyle: TextStyle(
-                                        color: isDark 
-                                          ? Colors.white.withOpacity(0.7) 
-                                          : Colors.black.withOpacity(0.7),
-                                      ),
-                                      hintStyle: TextStyle(
-                                        color: isDark 
-                                          ? Colors.white.withOpacity(0.3) 
-                                          : Colors.black.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter your email';
-                                      }
-                                      if (!value.contains('@')) {
-                                        return 'Please enter a valid email';
-                                      }
-                                      if (!value.endsWith('@marwadiuniversity.ac.in')) {
-                                        return 'Please use your Marwadi University email';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  
-                                  // Password Field
-                                  TextFormField(
-                                    controller: _passwordController,
-                                    obscureText: _obscurePassword,
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white : Colors.black,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: 'Password',
-                                      prefixIcon: const Icon(Icons.lock, color: Color(0xFF03A9F4)),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword 
-                                            ? Icons.visibility_off 
-                                            : Icons.visibility,
-                                          color: const Color(0xFF03A9F4),
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscurePassword = !_obscurePassword;
-                                          });
-                                        },
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                          color: isDark 
-                                            ? Colors.white.withOpacity(0.3) 
-                                            : Colors.black.withOpacity(0.3),
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF03A9F4),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      labelStyle: TextStyle(
-                                        color: isDark 
-                                          ? Colors.white.withOpacity(0.7) 
-                                          : Colors.black.withOpacity(0.7),
-                                      ),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter your password';
-                                      }
-                                      if (value.length < 6) {
-                                        return 'Password must be at least 6 characters';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 8),
-                                  
-                                  // Forgot Password
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton(
-                                      onPressed: () {
-                                        // Show forgot password dialog
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Password reset functionality will be implemented in future updates'),
-                                          ),
-                                        );
-                                      },
-                                      child: const Text(
-                                        'Forgot Password?',
-                                        style: TextStyle(
-                                          color: Color(0xFF03A9F4),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  
-                                  // Login Button
-                                  SizedBox(
-                                    height: 55,
-                                    child: ElevatedButton(
-                                      onPressed: _isLoading ? null : _performLogin,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF03A9F4),
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        elevation: 4,
-                                      ),
-                                      child: _isLoading
-                                          ? const SizedBox(
-                                              width: 24,
-                                              height: 24,
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Text(
-                                              'LOGIN',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 1.2,
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            child: _buildForm(),
                           ),
                         ),
                       ),

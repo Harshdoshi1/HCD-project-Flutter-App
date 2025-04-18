@@ -30,13 +30,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  permission_handler: ^11.0.0
-  image_picker: ^1.1.2
+  provider: ^6.0.0
+  shared_preferences: ^2.0.8
+  image_picker: ^0.8.4
+  http: ^1.1.0
   cupertino_icons: ^1.0.8
   fl_chart: ^0.66.2
   glassmorphism: ^3.0.0
-  shared_preferences: ^2.5.3
   flutter_launcher_icons: ^0.14.3
+  permission_handler: ^11.0.0
 
 dev_dependencies:
   flutter_test:

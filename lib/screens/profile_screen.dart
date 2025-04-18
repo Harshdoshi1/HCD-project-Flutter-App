@@ -3,26 +3,37 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/user_provider.dart';
+import '../models/user_model.dart';
+import '../services/academic_service.dart';
 import 'splash_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
 
-  const ProfileScreen({Key? key, required this.toggleTheme, required bool isDarkMode}) : super(key: key);
+  const ProfileScreen({
+    Key? key,
+    required this.toggleTheme,
+  }) : super(key: key);
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  bool _isEditing = false;
-  TextEditingController _nameController = TextEditingController();
-  TextEditingController _emailController = TextEditingController();
-  TextEditingController _bioController = TextEditingController();
-  TextEditingController _phoneController = TextEditingController(text: '+91 9313670684');
+  User? _currentUser;
+  File? _profileImage;
+  AcademicData? _academicData;
+  String? _academicError;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController(text: '+91 9313670684');
   
   // Achievement list
   List<Map<String, String>> _achievements = [
@@ -33,42 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   
   List<String> _skills = ['Flutter', 'Dart', 'UI/UX', 'Firebase'];
   String _newSkill = '';
-  File? _profileImage;
   final ImagePicker _picker = ImagePicker();
-
-  // Save profile image path to shared preferences
-  Future<void> _saveProfileImagePath(String path) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('userEmail') ?? '';
-      if (userEmail.isNotEmpty) {
-        await prefs.setString('${userEmail}_profileImage', path);
-      }
-    } catch (e) {
-      debugPrint('Error saving profile image path: $e');
-    }
-  }
-  
-  // Load profile image from shared preferences
-  Future<void> _loadProfileImage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('userEmail') ?? '';
-      if (userEmail.isNotEmpty) {
-        final imagePath = prefs.getString('${userEmail}_profileImage');
-        if (imagePath != null && imagePath.isNotEmpty) {
-          final file = File(imagePath);
-          if (await file.exists()) {
-            setState(() {
-              _profileImage = file;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading profile image: $e');
-    }
-  }
 
   @override
   void initState() {
@@ -83,39 +59,46 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     _fadeController.forward();
     _bioController.text = 'Passionate developer with focus on creating beautiful mobile experiences';
     
-    // Load user data from shared preferences
-    _loadUserData();
+    // Initialize user data from provider
+    _currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
+    if (_currentUser != null) {
+      _nameController.text = _currentUser!.name;
+      _emailController.text = _currentUser!.email;
+    }
+    
     _loadProfileImage();
+    // Load academic data after widget is mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAcademicData();
+    });
   }
+
+  bool _isEditing = false;
   
-  Future<void> _loadUserData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('userEmail') ?? 'harshdoshi@marwadiuniversity.ac.in';
-      
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update user data when it changes
+    final userProvider = Provider.of<UserProvider>(context, listen: true);
+    if (userProvider.currentUser != _currentUser) {
       setState(() {
-        _emailController.text = userEmail;
-        
-        // Extract name from email - only take alphabetic characters before @
-        if (userEmail.contains('@')) {
-          final emailParts = userEmail.split('@');
-          final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(emailParts[0]);
-          if (nameMatch != null && nameMatch.group(0) != null) {
-            String extractedName = nameMatch.group(0)!;
-            // Capitalize first letter
-            _nameController.text = extractedName[0].toUpperCase() + extractedName.substring(1);
-          }
+        _currentUser = userProvider.currentUser;
+        if (_currentUser != null) {
+          _nameController.text = _currentUser!.name;
+          _emailController.text = _currentUser!.email;
         }
       });
-    } catch (e) {
-      debugPrint('Error loading user data: $e');
     }
   }
-  
+
   Future<void> _logout() async {
     try {
+      // Clear user data from provider
+      Provider.of<UserProvider>(context, listen: false).clearUser();
+      
+      // Clear shared preferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', false);
+      await prefs.clear();
       
       if (!mounted) return;
       
@@ -318,12 +301,70 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       'Academic Information',
                       Icons.school,
                       [
-                        _buildInfoRow('Department', 'ICT', theme, isDark),
-                        _buildInfoRow('Semester', '6th', theme, isDark),
-                        _buildInfoRow('Lab Batch', 'A', theme, isDark),
-                        _buildInfoRow('Batch', '2022-2026', theme, isDark),
-                        _buildInfoRow('CGPA', '8.8', theme, isDark),
-                        _buildInfoRow('Rank', 'Top 10', theme, isDark),
+                        if (_academicError != null)
+                          _buildInfoRow('Error', _academicError!, theme, isDark)
+                        else if (_academicData != null) ...[
+                          _buildInfoRow('Enrollment', _academicData!.enrollmentNumber, theme, isDark),
+                          _buildInfoRow('Current Semester', '${_academicData!.currentSemester}', theme, isDark),
+                          _buildInfoRow('Latest CPI', _academicData!.latestCPI.toStringAsFixed(2), theme, isDark),
+                          _buildInfoRow('Latest SPI', _academicData!.latestSPI.toStringAsFixed(2), theme, isDark),
+                          _buildInfoRow('Current Rank', _academicData!.latestRank.toString(), theme, isDark),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Semester-wise Performance',
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...(_academicData!.semesterData.entries
+                              .where((entry) => entry.value.semesterNumber > 0)
+                              .toList()
+                              ..sort((a, b) => a.value.semesterNumber.compareTo(b.value.semesterNumber)))
+                              .map<Widget>((entry) => Padding(
+                                    padding: const EdgeInsets.only(left: 16.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Semester ${entry.value.semesterNumber}',
+                                          style: TextStyle(
+                                            color: isDark ? Colors.white70 : Colors.black87,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'SPI: ${entry.value.spi.toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                color: isDark ? Colors.white60 : Colors.black54,
+                                              ),
+                                            ),
+                                            Text(
+                                              'CPI: ${entry.value.cpi.toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                color: isDark ? Colors.white60 : Colors.black54,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Rank: ${entry.value.rank}',
+                                              style: TextStyle(
+                                                color: isDark ? Colors.white60 : Colors.black54,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                        ] else
+                          _buildInfoRow('Status', 'Loading academic data...', theme, isDark),
                       ],
                       theme,
                       isDark,
@@ -475,6 +516,32 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
       // Save the profile image path
       await _saveProfileImagePath(image.path);
+    }
+  }
+
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final imagePath = prefs.getString('profile_image_path');
+      if (imagePath != null && !kIsWeb) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          setState(() {
+            _profileImage = file;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading profile image: $e');
+    }
+  }
+
+  Future<void> _saveProfileImagePath(String path) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('profile_image_path', path);
+    } catch (e) {
+      debugPrint('Error saving profile image path: $e');
     }
   }
 
@@ -888,6 +955,48 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         'event': '',
       });
     });
+  }
+
+  Future<void> _loadAcademicData() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _academicError = null;
+    });
+
+    debugPrint('Loading academic data...');
+    if (_currentUser?.email == null) {
+      debugPrint('No email available');
+      setState(() {
+        _academicError = 'No user email available';
+      });
+      return;
+    }
+    
+    try {
+      debugPrint('Current user email: ${_currentUser!.email}');
+      final academicService = AcademicService();
+      final academicData = await academicService.getAcademicDataByEmail(_currentUser!.email);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        if (academicData != null) {
+          _academicData = academicData;
+          _academicError = null;
+          debugPrint('Academic data updated for enrollment: ${academicData.enrollmentNumber}');
+        } else {
+          _academicError = 'No academic records found';
+          debugPrint('No academic data received');
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading academic data: $e');
+      if (!mounted) return;
+      setState(() {
+        _academicError = 'Failed to load academic data: $e';
+      });
+    }
   }
 
   void _showNotifications(BuildContext context) {
