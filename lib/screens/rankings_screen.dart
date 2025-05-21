@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../services/student_service.dart';
 import '../models/student_ranking_model.dart';
 import 'student_detail_screen.dart';
+import 'student_activities_screen.dart';
 
 class RankingsScreen extends StatefulWidget {
   const RankingsScreen({Key? key, required this.toggleTheme}) : super(key: key);
@@ -102,12 +103,53 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     });
     
     try {
+      // Fetch students basic data (academic & points)
       final studentsList = await _studentService.getAllStudents();
       
       // Convert raw data to StudentRanking objects
       final List<StudentRanking> students = [];
       for (var student in studentsList) {
         students.add(StudentRanking.fromJson(student));
+      }
+      
+      // Fetch current semester points (extracurricular & co-curricular)
+      final pointsList = await _studentService.getAllStudentsCurrentSemesterPoints();
+      
+      // If we successfully got points data, merge it with students
+      if (pointsList.isNotEmpty) {
+        // Create a map for quick lookup by enrollment number
+        final pointsMap = <String, Map<String, dynamic>>{};
+        for (var point in pointsList) {
+          final enrollmentNumber = point['enrollmentNumber'];
+          if (enrollmentNumber != null) {
+            pointsMap[enrollmentNumber] = point;
+          }
+        }
+        
+        // Update each student with their points
+        for (int i = 0; i < students.length; i++) {
+          final student = students[i];
+          final points = pointsMap[student.enrollmentNumber];
+          
+          if (points != null) {
+            // Create a new student object with updated points
+            students[i] = StudentRanking(
+              id: student.id,
+              name: student.name,
+              email: student.email,
+              enrollmentNumber: student.enrollmentNumber,
+              hardwarePoints: student.hardwarePoints,
+              softwarePoints: student.softwarePoints,
+              cocurricularPoints: points['totalCocurricular'] ?? 0,
+              extracurricularPoints: points['totalExtracurricular'] ?? 0,
+              cpi: student.cpi,
+              spi: student.spi,
+              rank: student.rank,
+              batch: student.batch,
+              currentSemester: student.currentSemester,
+            );
+          }
+        }
       }
       
       setState(() {
@@ -389,7 +431,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
           final name = student.name;
           final subtitle = isAcademic
               ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester}'
-              : 'HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | Total: ${student.totalPoints}';
+              : 'HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | CC: ${student.cocurricularPoints} | EC: ${student.extracurricularPoints} | Total: ${student.totalPoints + student.totalActivityPoints}';
                 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -401,20 +443,33 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   }
 
   Widget _buildStudentCard(int rank, String name, String subtitle, bool isDark, StudentRanking student) {
+    final isAcademic = _tabController.index == 0;
+    
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StudentDetailScreen(
-              studentName: name,
-              studentEmail: student.email,
-              studentEnrollment: student.enrollmentNumber,
-              studentDetails: 'Semester: ${student.currentSemester} | HW Points: ${student.hardwarePoints} | SW Points: ${student.softwarePoints} | CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'}',
-              toggleTheme: widget.toggleTheme,
+        if (isAcademic) {
+          // Academic section: navigate to student profile
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentDetailScreen(
+                studentName: name,
+                studentEmail: student.email,
+                studentEnrollment: student.enrollmentNumber,
+                studentDetails: 'Semester: ${student.currentSemester} | HW Points: ${student.hardwarePoints} | SW Points: ${student.softwarePoints} | CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'}',
+                toggleTheme: widget.toggleTheme,
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          // Non-academic section: navigate to student activities
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentActivitiesScreen(student: student),
+            ),
+          );
+        }
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),

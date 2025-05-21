@@ -245,4 +245,131 @@ class StudentService {
       return [];
     }
   }
+  
+  // Get current semester points for all students
+  Future<List<dynamic>> getAllStudentsCurrentSemesterPoints() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token == null) {
+        print('Authentication token not found for getting student points, returning empty list');
+        return [];
+      }
+      
+      // Get all students first to have their enrollment numbers and semesters
+      final students = await getAllStudents();
+      if (students.isEmpty) {
+        return [];
+      }
+      
+      // Process each student to get their points
+      final List<Map<String, dynamic>> results = [];
+      
+      for (var student in students) {
+        final enrollmentNumber = student['enrollmentNumber'];
+        final semester = student['currnetsemester'] ?? student['currentSemester'] ?? 1;
+        
+        // Use the fetchEventsbyEnrollandSemester endpoint
+        try {
+          final response = await http.post(
+            Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: json.encode({
+              'enrollmentNumber': enrollmentNumber,
+              'semester': semester.toString()
+            }),
+          );
+          
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            
+            // Calculate totals
+            int totalCocurricular = 0;
+            int totalExtracurricular = 0;
+            
+            if (data is List) {
+              for (var activity in data) {
+                totalCocurricular += int.parse(activity['totalCocurricular']?.toString() ?? '0');
+                totalExtracurricular += int.parse(activity['totalExtracurricular']?.toString() ?? '0');
+              }
+            } else if (data is Map && data.containsKey('totalCocurricular')) {
+              totalCocurricular = int.parse(data['totalCocurricular']?.toString() ?? '0');
+              totalExtracurricular = int.parse(data['totalExtracurricular']?.toString() ?? '0');
+            }
+            
+            // Add to results
+            results.add({
+              'studentId': student['id'],
+              'name': student['name'],
+              'email': student['email'],
+              'enrollmentNumber': enrollmentNumber,
+              'semester': semester,
+              'totalCocurricular': totalCocurricular,
+              'totalExtracurricular': totalExtracurricular,
+              'activityData': data
+            });
+          }
+        } catch (e) {
+          print('Error getting points for student $enrollmentNumber: $e');
+          // Add student with zero points
+          results.add({
+            'studentId': student['id'],
+            'name': student['name'],
+            'email': student['email'],
+            'enrollmentNumber': enrollmentNumber,
+            'semester': semester,
+            'totalCocurricular': 0,
+            'totalExtracurricular': 0,
+            'activityData': []
+          });
+        }
+      }
+      
+      return results;
+    } catch (e) {
+      print('Error getting student points: ${e.toString()}, returning empty list');
+      return [];
+    }
+  }
+  
+  // Get student activities for all semesters
+  Future<List<dynamic>> getStudentActivitiesBySemesters(String enrollmentNumber) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token == null) {
+        print('Authentication token not found for getting student activities, returning empty list');
+        return [];
+      }
+      
+      // Use the fetchEventsbyEnrollandSemester endpoint with 'all' for semester
+      final response = await http.post(
+        Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'enrollmentNumber': enrollmentNumber,
+          'semester': 'all'
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data is List ? data : [];
+      } else {
+        print('Failed to get student activities: ${response.body}, returning empty list');
+        return [];
+      }
+    } catch (e) {
+      print('Error getting student activities: ${e.toString()}, returning empty list');
+      return [];
+    }
+  }
 }
