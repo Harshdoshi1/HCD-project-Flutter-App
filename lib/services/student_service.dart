@@ -8,8 +8,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 
 class StudentService {
-  // Hardcoded URL for now - we're forcing localhost for web
-  static final String baseUrl = 'http://localhost:5001/api';
+  // Base URL that works for different environments
+  static String get baseUrl {
+    // For web or desktop - use localhost
+    if (kIsWeb || Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return 'http://localhost:5001/api';
+    }
+    // For Android emulator - use 10.0.2.2 (special IP that routes to host machine)
+    else if (Platform.isAndroid) {
+      return 'http://10.0.2.2:5001/api'; 
+    }
+    // For iOS simulator - use localhost
+    else if (Platform.isIOS) {
+      return 'http://localhost:5001/api';
+    }
+    // Default fallback
+    return 'http://localhost:5001/api';
+  }
 
   // Get current logged-in student profile
   Future<User> getCurrentStudent() async {
@@ -37,8 +52,8 @@ class StudentService {
     try {
       debugPrint('Attempting login with email: $email and enrollment: $enrollmentNumber');
       
-      // Force using localhost URL for login in browser
-      final loginUrl = 'http://localhost:5001/api/students/login';
+      // Use dynamic baseUrl that works across all platforms
+      final loginUrl = '$baseUrl/students/login';
       debugPrint('Using login URL: $loginUrl');
       
       final response = await http.post(

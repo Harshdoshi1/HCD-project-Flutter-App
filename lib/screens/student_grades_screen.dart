@@ -64,8 +64,12 @@ class _StudentGradesScreenState extends State<StudentGradesScreen> with SingleTi
     });
     
     try {
+      print('Fetching academic data for student: ${widget.student.name}, email: ${widget.student.email}');
+      
       // Fetch student component data using their email
       final Map<String, dynamic> result = await _studentService.getStudentComponentMarksAndSubjects(widget.student.email);
+      
+      print('Received student component data response: $result');
       
       // Convert the Map<String, dynamic> to a StudentComponentData object
       final StudentComponentData studentData = StudentComponentData.fromJson(result);
@@ -76,16 +80,28 @@ class _StudentGradesScreenState extends State<StudentGradesScreen> with SingleTi
         
         // Set default selected semester to the student's current semester
         if (_studentData != null && _studentData!.semesters.isNotEmpty) {
+          print('Student has ${_studentData!.semesters.length} semesters of data');
           // Try to find the current semester
           final currentSemester = widget.student.currentSemester;
           final hasSemester = _studentData!.semesters.any((s) => s.semesterNumber == currentSemester);
           if (hasSemester) {
             _selectedSemester = currentSemester;
+            print('Setting selected semester to current semester: $_selectedSemester');
+          } else {
+            // If current semester not found, select the highest available semester
+            final highestSemester = _studentData!.semesters
+                .map((s) => s.semesterNumber)
+                .reduce((a, b) => a > b ? a : b);
+            _selectedSemester = highestSemester;
+            print('Current semester not found, selecting highest available: $_selectedSemester');
           }
+        } else {
+          print('No semester data available for student');
         }
       });
       
     } catch (e) {
+      print('Error fetching student grades: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;

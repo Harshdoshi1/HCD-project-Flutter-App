@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'dart:ui';
@@ -270,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // First, fetch the total activity points from the new endpoint
           try {
             final pointsResponse = await http.post(
-              Uri.parse('http://localhost:5001/api/events/fetchTotalActivityPoints'),
+              Uri.parse(ApiConfig.getUrl('events/fetchTotalActivityPoints')),
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer $token',
@@ -308,7 +309,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // Then, fetch detailed activities data
           try {
             final response = await http.post(
-              Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+              Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer $token',

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
 import 'main_navigation.dart';
 import '../services/auth_service.dart';
+import '../utils/api_config.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback? toggleTheme;
@@ -21,6 +22,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _useLocalTestingMode = false;
   final _authService = AuthService();
   
   final _emailController = TextEditingController();
@@ -33,6 +35,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    // Load local testing mode preference
+    _loadLocalTestingModePreference();
+    
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -54,6 +59,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _animationController.forward();
   }
   
+  // Load local testing mode preference from SharedPreferences
+  Future<void> _loadLocalTestingModePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _useLocalTestingMode = prefs.getBool('use_local_mock_data') ?? false;
+    });
+    // Also set it in the API config
+    ApiConfig.useLocalMockData = _useLocalTestingMode;
+  }
+  
+  // Save local testing mode preference to SharedPreferences
+  Future<void> _saveLocalTestingModePreference(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use_local_mock_data', value);
+    // Also update the API config
+    await ApiConfig.setUseLocalMockData(value);
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -64,6 +87,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Future<void> _performLogin() async {
     if (_formKey.currentState!.validate()) {
+      // Save the current local testing mode setting
+      await _saveLocalTestingModePreference(_useLocalTestingMode);
+      
       setState(() {
         _isLoading = true;
       });
@@ -79,11 +105,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
         // Save user data to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', response['token']);
+        await prefs.setString('token', response['token'] ?? 'mock-token');
         
         // Save the complete user data as JSON string
         final user = response['user'];
-        await prefs.setString('userData', json.encode(user.toJson()));
+        if (user != null) {
+          await prefs.setString('userData', json.encode(user.toJson()));
+        } else {
+          print('Warning: User object is null in login response');
+          // Store basic info to prevent crashes
+          await prefs.setString('userData', json.encode({
+            'id': '1',
+            'name': 'Test User',
+            'email': _emailController.text,
+            'enrollmentNumber': _enrollmentController.text,
+            'currentSemester': 6,
+            'role': 'student',
+          }));
+        }
         await prefs.setBool('isLoggedIn', true);
         
         setState(() {
@@ -213,28 +252,31 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           ),
           const SizedBox(height: 8),
           
-          // Forgot Password
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {
-                // Show forgot password dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Password reset functionality will be implemented in future updates'),
+          // Local Testing Mode Toggle
+          Row(
+            children: [
+              Switch(
+                value: _useLocalTestingMode,
+                onChanged: (value) {
+                  setState(() {
+                    _useLocalTestingMode = value;
+                  });
+                },
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Local Testing Mode (No backend required)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87,
                   ),
-                );
-              },
-              child: const Text(
-                'Forgot Password?',
-                style: TextStyle(
-                  color: Color(0xFF03A9F4),
-                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 24),
+          
+          const SizedBox(height: 16),
           
           // Login Button
           SizedBox(

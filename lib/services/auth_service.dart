@@ -6,17 +6,49 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
+import '../utils/api_config.dart';
 
 class AuthService {
-  // Force using localhost for web browsers
-  static final String baseUrl = 'http://localhost:5001/api';
+  // Get base URL from centralized API config
+  static String get baseUrl => ApiConfig.baseUrl;
 
   Future<Map<String, dynamic>> login(String email, String enrollmentNumber, BuildContext context) async {
     try {
-      print('Attempting login with email: $email and enrollment: $enrollmentNumber');
+      print('Attempting to log in with email: $email and enrollment number: $enrollmentNumber');
       
-      // Hardcode the login URL for web browser compatibility
-      final loginUrl = 'http://localhost:5001/api/students/login';
+      // Check if we're using local mock data mode
+      if (ApiConfig.useLocalMockData) {
+        print('Using local mock data for login');
+        
+        // Create mock user data for testing
+        final User mockUser = User(
+          id: '1',
+          name: 'Test Student',
+          email: email,
+          enrollmentNumber: enrollmentNumber,
+          role: 'student',
+          currentSemester: 6,  // Default to semester 6
+          batch: '2023',
+          hardwarePoints: 25,
+          softwarePoints: 30,
+        );
+        
+        // Update the user provider
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        userProvider.setUser(mockUser);
+        
+        // Return a success response with the mock user
+        return {
+          'success': true,
+          'message': 'Logged in using local mock data',
+          'token': 'mock-token-for-testing',
+          'user': mockUser
+        };
+      }
+      
+      // Normal API login if not using mock data
+      // Get proper URL for the current platform
+      final loginUrl = ApiConfig.getUrl('students/login');
       print('Using login URL: $loginUrl');
       
       final response = await http.post(

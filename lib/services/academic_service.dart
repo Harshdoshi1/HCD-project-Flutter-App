@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import '../utils/api_config.dart';
 
 class SemesterData {
   final int semesterId;
@@ -109,27 +110,15 @@ class SemesterSPI {
 }
 
 class AcademicService {
-  // Dynamic base URL that works for both web and mobile platforms
+  // Use the centralized API configuration
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:5001/api/studentCPI';
-    } else if (Platform.isAndroid) {
-      // Android emulator needs special IP to access host machine
-      return 'http://10.0.2.2:5001/api/studentCPI';
-    } else {
-      // iOS and other platforms
-      return 'http://localhost:5001/api/studentCPI';
-    }
+    return '${ApiConfig.baseUrl}/studentCPI';
   }
 
   Future<List<SemesterSPI>> getStudentSPI(String email) async {
     try {
       final encodedEmail = Uri.encodeComponent(email);
-      final endpoint = kIsWeb 
-        ? 'http://localhost:5001/api/studentCPI/spi/$encodedEmail'
-        : Platform.isAndroid 
-          ? 'http://10.0.2.2:5001/api/studentCPI/spi/$encodedEmail'
-          : 'http://localhost:5001/api/studentCPI/spi/$encodedEmail';
+      final endpoint = '${ApiConfig.baseUrl}/studentCPI/spi/$encodedEmail';
       
       debugPrint('Fetching SPI data from: $endpoint');
       final response = await http.get(
@@ -210,7 +199,7 @@ class AcademicService {
   Future<List<Map<String, dynamic>>> getSemesterSPIByEnrollment(String enrollmentNumber) async {
     try {
       final encodedEnrollment = Uri.encodeComponent(enrollmentNumber);
-      final endpoint = 'http://localhost:5001/api/studentCPI/enrollment/$encodedEnrollment';
+      final endpoint = '${ApiConfig.baseUrl}/studentCPI/enrollment/$encodedEnrollment';
       
       debugPrint('Fetching semester SPI data from: $endpoint');
       final response = await http.get(

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
+import '../utils/api_config.dart';
 
 class ActivitiesScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -122,7 +123,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
       // First, fetch the total activity points from the endpoint
       try {
         final pointsResponse = await http.post(
-          Uri.parse('http://localhost:5001/api/events/fetchTotalActivityPoints'),
+          Uri.parse(ApiConfig.getUrl('events/fetchTotalActivityPoints')),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -152,7 +153,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
       
       // Get all semesters' activities
       final allResponse = await http.post(
-        Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+        Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

@@ -4,9 +4,14 @@ import 'package:provider/provider.dart';
 import 'constants/app_theme.dart';
 import 'providers/user_provider.dart';
 import 'screens/splash_screen.dart';
+import 'utils/api_config.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize API configuration
+  await ApiConfig.loadConfig();
+  
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
