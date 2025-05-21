@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'dart:ui';
 import 'dart:io';
+import 'dart:convert';
 import '../providers/user_provider.dart';
 import '../services/academic_service.dart';
 import 'profile_screen.dart';
@@ -21,6 +23,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  // Activity points for the logged-in user
+  int _cocurricularPoints = 0;
+  int _extracurricularPoints = 0;
+  bool _isLoadingActivityPoints = true;
+  List<dynamic> _activities = [];
+  String? _enrollmentNumber;  
   final AcademicService _academicService = AcademicService();
   List<SemesterSPI>? _spiData;
   List<Map<String, dynamic>> _semesterSPIData = [];
@@ -245,10 +253,122 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  Future<void> _loadActivityPoints() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      
+      if (user != null) {
+        setState(() {
+          _enrollmentNumber = user.enrollmentNumber;
+        });
+        
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('token');
+        
+        if (token != null && _enrollmentNumber != null) {
+          // First, fetch the total activity points from the new endpoint
+          try {
+            final pointsResponse = await http.post(
+              Uri.parse('http://localhost:5001/api/events/fetchTotalActivityPoints'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'enrollmentNumber': _enrollmentNumber,
+              }),
+            );
+            
+            if (pointsResponse.statusCode == 200) {
+              final pointsData = json.decode(pointsResponse.body);
+              
+              print('Total activity points response: $pointsData');
+              
+              setState(() {
+                _cocurricularPoints = pointsData['totalCocurricular'] != null ? 
+                    int.parse(pointsData['totalCocurricular'].toString()) : 0;
+                _extracurricularPoints = pointsData['totalExtracurricular'] != null ? 
+                    int.parse(pointsData['totalExtracurricular'].toString()) : 0;
+              });
+            }
+          } catch (e) {
+            print('Error fetching total activity points: $e');
+            // If we can't get points from the new endpoint, fallback to user data
+            final userData = prefs.getString('userData');
+            if (userData != null) {
+              final userMap = json.decode(userData);
+              setState(() {
+                _cocurricularPoints = userMap['totalCocurricular'] ?? userMap['cocurricularPoints'] ?? 0;
+                _extracurricularPoints = userMap['totalExtracurricular'] ?? userMap['extracurricularPoints'] ?? 0;
+              });
+            }
+          }
+          
+          // Then, fetch detailed activities data
+          try {
+            final response = await http.post(
+              Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'enrollmentNumber': _enrollmentNumber,
+                'semester': 'all'
+              }),
+            );
+            
+            if (response.statusCode == 200) {
+              final data = json.decode(response.body);
+              
+              if (data is List && data.isNotEmpty) {
+                setState(() {
+                  _activities = data;
+                  _isLoadingActivityPoints = false;
+                });
+              } else if (data is Map) {
+                // Handle case when API returns a map instead of a list
+                setState(() {
+                  _isLoadingActivityPoints = false;
+                });
+              }
+            } else {
+              setState(() {
+                _isLoadingActivityPoints = false;
+              });
+            }
+          } catch (e) {
+            print('Error fetching activities: $e');
+            setState(() {
+              _isLoadingActivityPoints = false;
+            });
+          }
+        } else {
+          setState(() {
+            _isLoadingActivityPoints = false;
+          });
+        }
+      } else {
+        setState(() {
+          _cocurricularPoints = 0;
+          _extracurricularPoints = 0;
+          _isLoadingActivityPoints = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading activity points: $e');
+      setState(() {
+        _isLoadingActivityPoints = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadSPIData();
+    _loadActivityPoints();
     _graphAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -469,10 +589,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildIconButton('SGPA', Icons.bar_chart, _activeGraph == 'sgpa', () => _switchGraph('sgpa')),
-        _buildIconButton('Expertise', Icons.pie_chart, _activeGraph == 'expertise', () => _switchGraph('expertise')),
         _buildIconButton('Subjects', Icons.radar, _activeGraph == 'subjects', () => _switchGraph('subjects')),
-        _buildIconButton('Languages', Icons.code, _activeGraph == 'languages', () => _switchGraph('languages')),
+        _buildIconButton('Activities', Icons.pie_chart, _activeGraph == 'activities', () => _switchGraph('activities')),
         _buildIconButton('Semesters', Icons.insert_chart, _activeGraph == 'semesters', () => _switchGraph('semesters')),
       ],
     );
@@ -1369,14 +1487,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   IconData _getIconForTitle(String title) {
     switch (title) {
-      case 'SGPA Progression':
-        return Icons.bar_chart;
-      case 'Domain Expertise':
-        return Icons.pie_chart;
       case 'Current Semester Subjects':
         return Icons.radar;
-      case 'Programming Languages':
-        return Icons.code;
+      case 'Activity Points':
+        return Icons.pie_chart;
       default:
         return Icons.analytics;
     }
@@ -1384,14 +1498,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   String _getChartTitle() {
     switch (_activeGraph) {
-      case 'sgpa':
-        return 'Semester Performance';
-      case 'expertise':
-        return 'Domain Expertise';
       case 'subjects':
         return 'Subject Performance';
-      case 'languages':
-        return 'Programming Languages';
+      case 'activities':
+        return 'Activity Points';
       case 'semesters':
         return 'All Semester SPIs';
       default:
@@ -1401,18 +1511,445 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _getActiveChart() {
     switch (_activeGraph) {
-      case 'expertise':
-        return _buildDomainExpertiseChart();
       case 'subjects':
         return _buildAnimatedRadarChart(); 
-      case 'languages':
-        return _buildProgrammingLanguagesChart();
+      case 'activities':
+        return _buildActivityPointsChart();
       case 'semesters':
         return _buildSemesterSPIChart();
-      case 'sgpa':
       default:
-        return _buildDomainExpertiseChart(); // Temporary, replace with SGPA chart
+        return _buildAnimatedRadarChart(); // Default to subjects chart
     }
+  }
+  
+  Widget _buildActivityPointsChart() {
+    if (_isLoadingActivityPoints) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(height: 40),
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading activity data...'),
+          ],
+        ),
+      );
+    }
+    
+    // If both points are 0, show a message
+    if (_cocurricularPoints == 0 && _extracurricularPoints == 0) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.pie_chart_outline, size: 60, color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No activity points available',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Participate in activities to earn points',
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Group activities by type
+    final coCurricularActivities = _activities.where((activity) => activity['eventType'] == 'co-curricular').toList();
+    final extraCurricularActivities = _activities.where((activity) => activity['eventType'] == 'extra-curricular').toList();
+    
+    // Colors for the pie chart sections with gradient effects
+    final Color cocurricularColor = const Color(0xFF4CAF50); // Green
+    final Color extracurricularColor = const Color(0xFF2196F3); // Blue
+    
+    // Calculate percentages
+    final totalPoints = _cocurricularPoints + _extracurricularPoints;
+    final cocurricularPercentage = (_cocurricularPoints / totalPoints * 100).toStringAsFixed(1);
+    final extracurricularPercentage = (_extracurricularPoints / totalPoints * 100).toStringAsFixed(1);
+    
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Enhanced pie chart with card wrapper
+          Card(
+            elevation: 4,
+            shadowColor: Colors.black26,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Text(
+                    'Activity Points Distribution',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  // Animated pie chart
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 1500),
+                    curve: Curves.elasticOut,
+                    builder: (context, value, child) {
+                      return SizedBox(
+                        height: 220,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Animated pie chart
+                            PieChart(
+                              PieChartData(
+                                sectionsSpace: 2,
+                                centerSpaceRadius: 50,
+                                sections: [
+                                  PieChartSectionData(
+                                    color: cocurricularColor,
+                                    value: _cocurricularPoints.toDouble() * value,
+                                    title: '$cocurricularPercentage%',
+                                    radius: 90,
+                                    titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                    badgeWidget: _cocurricularPoints > _extracurricularPoints ? 
+                                        _buildBadge(Icons.emoji_events, cocurricularColor) : null,
+                                    badgePositionPercentageOffset: 1.1,
+                                  ),
+                                  PieChartSectionData(
+                                    color: extracurricularColor,
+                                    value: _extracurricularPoints.toDouble() * value,
+                                    title: '$extracurricularPercentage%',
+                                    radius: 90,
+                                    titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                    badgeWidget: _extracurricularPoints > _cocurricularPoints ? 
+                                        _buildBadge(Icons.emoji_events, extracurricularColor) : null,
+                                    badgePositionPercentageOffset: 1.1,
+                                  ),
+                                ],
+                              ),
+                              swapAnimationDuration: const Duration(milliseconds: 750),
+                              swapAnimationCurve: Curves.easeInOutQuint,
+                            ),
+                            
+                            // Center total counter
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  )
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${(totalPoints * value).toInt()}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                                  ),
+                                  const Text(
+                                    'TOTAL',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Enhanced legend cards
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Co-curricular card
+                      _buildLegendCard(
+                        'Co-curricular',
+                        _cocurricularPoints,
+                        cocurricularColor,
+                        Icons.school,
+                        '$cocurricularPercentage%',
+                      ),
+                      
+                      // Extra-curricular card
+                      _buildLegendCard(
+                        'Extra-curricular',
+                        _extracurricularPoints,
+                        extracurricularColor,
+                        Icons.sports_soccer,
+                        '$extracurricularPercentage%',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Total points display
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [cocurricularColor.withOpacity(0.8), extracurricularColor.withOpacity(0.8)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            child: Text(
+              'Total: ${_cocurricularPoints + _extracurricularPoints} points',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Activity Breakdown
+          Text(
+            'Activities Breakdown',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          
+          // Co-curricular Activities
+          if (coCurricularActivities.isNotEmpty) ...[  
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Co-curricular Activities',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              itemCount: coCurricularActivities.length,
+              itemBuilder: (context, index) {
+                final activity = coCurricularActivities[index];
+                return _buildActivityItem(
+                  activity['eventName'] ?? 'Unknown Activity',
+                  activity['eventDate'] != null ? DateTime.parse(activity['eventDate']).toString().substring(0, 10) : 'Unknown Date',
+                  activity['participationType'] ?? 'Participant',
+                  int.parse(activity['totalCocurricular']?.toString() ?? '0'),
+                  cocurricularColor,
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+          
+          // Extra-curricular Activities
+          if (extraCurricularActivities.isNotEmpty) ...[  
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Extra-curricular Activities',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              itemCount: extraCurricularActivities.length,
+              itemBuilder: (context, index) {
+                final activity = extraCurricularActivities[index];
+                return _buildActivityItem(
+                  activity['eventName'] ?? 'Unknown Activity',
+                  activity['eventDate'] != null ? DateTime.parse(activity['eventDate']).toString().substring(0, 10) : 'Unknown Date',
+                  activity['participationType'] ?? 'Participant',
+                  int.parse(activity['totalExtracurricular']?.toString() ?? '0'),
+                  extracurricularColor,
+                );
+              },
+            ),
+          ],
+          
+          // If no activities are available
+          if (_activities.isEmpty) 
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Text(
+                'No detailed activity data available',
+                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  // Badge widget for the pie chart
+  Widget _buildBadge(IconData icon, Color color) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.bounceInOut,
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            spreadRadius: 2,
+          )
+        ],
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Icon(icon, color: color, size: 16),
+    );
+  }
+  
+  // Legend card for pie chart
+  Widget _buildLegendCard(String title, int points, Color color, IconData icon, String percentage) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.5), width: 1),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 14),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$points pts',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  percentage,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildActivityItem(String name, String date, String type, int points, Color color) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.star,
+                color: color,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Date: $date',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  Text(
+                    'Type: $type',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: color.withOpacity(0.5)),
+              ),
+              child: Text(
+                '$points pts',
+                style: TextStyle(fontWeight: FontWeight.bold, color: color),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Build semester SPI bar chart

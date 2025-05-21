@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
 import 'main_navigation.dart';
@@ -79,6 +80,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         // Save user data to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', response['token']);
+        
+        // Save the complete user data as JSON string
+        final user = response['user'];
+        await prefs.setString('userData', json.encode(user.toJson()));
+        await prefs.setBool('isLoggedIn', true);
         
         setState(() {
           _isLoading = false;

@@ -4,6 +4,7 @@ import 'dashboard.dart';
 import 'subjects_screen.dart';
 import 'rankings_screen.dart';
 import 'profile_screen.dart';
+import 'activities_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -35,6 +36,7 @@ class _MainNavigationState extends State<MainNavigation> {
       DashboardScreen(toggleTheme: widget.toggleTheme),
       SubjectsScreen(toggleTheme: widget.toggleTheme),
       RankingsScreen(toggleTheme: widget.toggleTheme),
+      ActivitiesScreen(toggleTheme: widget.toggleTheme),
       ProfileScreen(toggleTheme: widget.toggleTheme),
     ];
 
@@ -94,6 +96,10 @@ class _MainNavigationState extends State<MainNavigation> {
                   BottomNavigationBarItem(
                     icon: Icon(Icons.leaderboard),
                     label: 'Rankings',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.event),
+                    label: 'Activities',
                   ),
                   BottomNavigationBarItem(
                     icon: Icon(Icons.person),

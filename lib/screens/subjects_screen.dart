@@ -505,8 +505,28 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     // Default grade
     String grade = 'NA';
     Color gradeColor = Colors.grey;
-        // Calculate grade if we have marks and weightage
-    if (hasMarks && hasWeightage) {
+    
+    // Use grades from API if available
+    if (subject.grades != null && subject.grades!.isNotEmpty) {
+      grade = subject.grades!;
+      
+      // Assign color based on grade
+      if (grade == 'A+' || grade == 'A' || grade == 'O') {
+        gradeColor = Colors.green;
+      } else if (grade == 'B+' || grade == 'B') {
+        gradeColor = Colors.lightGreen;
+      } else if (grade == 'C+' || grade == 'C') {
+        gradeColor = Colors.amber;
+      } else if (grade == 'D') {
+        gradeColor = Colors.orange;
+      } else if (grade == 'F' || grade == 'FF') {
+        gradeColor = Colors.red;
+      } else {
+        gradeColor = Colors.grey;
+      }
+    }
+    // If no grades from API, calculate grade if we have marks and weightage
+    else if (hasMarks && hasWeightage) {
       try {
         // This is a simplified grade calculation with safer null handling
         double totalMarks = 0;

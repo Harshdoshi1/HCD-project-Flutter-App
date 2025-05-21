@@ -100,6 +100,7 @@ class SubjectData {
   final int? credits;
   final ComponentMarks? componentMarks;
   final ComponentWeightage? componentWeightage;
+  final String? grades; // Added grades field
 
   SubjectData({
     required this.subjectId,
@@ -108,6 +109,7 @@ class SubjectData {
     this.credits,
     this.componentMarks,
     this.componentWeightage,
+    this.grades,
   });
 
   factory SubjectData.fromJson(Map<String, dynamic> json) {
@@ -122,6 +124,7 @@ class SubjectData {
       componentWeightage: json['componentWeightage'] != null
           ? ComponentWeightage.fromJson(json['componentWeightage'])
           : null,
+      grades: json['grades'],
     );
   }
 }
