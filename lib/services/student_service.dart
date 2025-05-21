@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
@@ -138,19 +139,6 @@ class StudentService {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       
-      if (token == null) {
-        print('Authentication token not found, returning default academic data');
-        return {
-          'cpiData': {
-            'latestCPI': 0.0,
-            'latestSPI': 0.0,
-            'rank': 0,
-            'semesterNumber': 0
-          },
-          'semesterData': []
-        };
-      }
-      
       final response = await http.get(
         Uri.parse('$baseUrl/studentCPI/email/$email'),
         headers: {
@@ -188,16 +176,42 @@ class StudentService {
         'semesterData': []
       };
     } catch (e) {
-      print('Error getting student academic data: ${e.toString()}, returning defaults');
-      return {
-        'cpiData': {
-          'latestCPI': 0.0,
-          'latestSPI': 0.0,
-          'rank': 0,
-          'semesterNumber': 0
-        },
-        'semesterData': []
-      };
+      print('Error getting student academic data: $e');
+      throw Exception('Failed to load student academic data');
+    }
+  }
+
+  // Get student component marks and subjects by email
+  Future<Map<String, dynamic>> getStudentComponentMarksAndSubjects(String email) async {
+    try {
+      // Print debug info
+      print('Making API request to get component marks for email: $email');
+      
+      // Ensure baseUrl is correct - for local dev, use specific IP
+      final apiUrl = 'http://localhost:5001/api/studentCPI/getStudentComponentMarksAndSubjectsByEmail';
+      print('API URL: $apiUrl');
+      
+      final requestBody = jsonEncode({'email': email});
+      print('Request body: $requestBody');
+      
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body.substring(0, min(100, response.body.length))}...');
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body) as Map<String, dynamic>;
+        return result;
+      } else {
+        throw Exception('Failed to load data: Status ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error getting student component marks and subjects: $e');
+      rethrow;
     }
   }
 

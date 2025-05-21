@@ -408,12 +408,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   const SizedBox(height: 24),
                   // Charts section
                   _buildChartsSection(),
-                  const SizedBox(height: 24),
-                  // Events section
-                  _buildEventsSection(),
-                  const SizedBox(height: 24),
-                  // Clubs section
-                  _buildClubsSection(),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -1789,82 +1783,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildEventsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Upcoming Events',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-                  width: 1,
-                ),
-              ),
-              child: DefaultTabController(
-                length: 2,
-                child: Column(
-                  children: [
-                    Container(
-                      height: 45,
-                      margin: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.05) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: TabBar(
-                        indicator: BoxDecoration(
-                          borderRadius: BorderRadius.circular(25),
-                          color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF03A9F4).withOpacity(0.2),
-                              blurRadius: 4,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        dividerColor: Colors.transparent,
-                        labelColor: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                        unselectedLabelColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.6) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6)),
-                        tabs: const [
-                          Tab(text: 'Academic'),
-                          Tab(text: 'Non-Academic'),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: 200, // Reduced from 220 to 200
-                      child: TabBarView(
-                        children: [
-                          _buildEventsList(academicEvents),
-                          _buildEventsList(nonAcademicEvents),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // Events section removed as requested
 }
 
 class RadarChartPainter extends CustomPainter {

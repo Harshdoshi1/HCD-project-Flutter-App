@@ -202,7 +202,12 @@ class SubjectDetailScreen extends StatelessWidget {
           final data = entry.value as Map<String, dynamic>;
           final marks = data['marks'] as int;
           final outOf = data['outOf'] as int;
-          final percentage = (marks / outOf) * 100;
+          
+          // Safe percentage calculation
+          double percentage = 0.0;
+          if (outOf > 0) {
+            percentage = (marks / outOf) * 100;
+          }
           
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -257,7 +262,7 @@ class SubjectDetailScreen extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: LinearProgressIndicator(
-                  value: marks / outOf,
+                  value: outOf > 0 ? (marks / outOf) : 0.0,
                   backgroundColor: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                   color: _getProgressColor(percentage),
                   minHeight: 10,
@@ -265,9 +270,9 @@ class SubjectDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${percentage.toStringAsFixed(1)}%',
+                outOf > 0 ? '${percentage.toStringAsFixed(1)}%' : 'N/A',
                 style: TextStyle(
-                  color: _getProgressColor(percentage),
+                  color: outOf > 0 ? _getProgressColor(percentage) : Colors.grey,
                   fontWeight: FontWeight.bold,
                 ),
               ),
