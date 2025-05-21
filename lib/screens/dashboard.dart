@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
+import 'dart:ui';
+import 'dart:io';
+import '../providers/user_provider.dart';
+import '../services/academic_service.dart';
 import 'profile_screen.dart';
 import '../constants/app_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -17,6 +21,11 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  final AcademicService _academicService = AcademicService();
+  List<SemesterSPI>? _spiData;
+  List<Map<String, dynamic>> _semesterSPIData = [];
+  bool _isLoadingSemesterSPI = true;
+  bool _isLoadingSPI = true;
   String _activeGraph = 'sgpa';
   late AnimationController _graphAnimationController;
   late Animation<double> _fadeAnimation;
@@ -164,21 +173,72 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late String _dailyQuote;
   String _userName = 'User';
 
+  Future<void> _loadSPIData() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      if (user != null) {
+        debugPrint('Fetching SPI data for: ${user.email}');
+        final spiData = await _academicService.getStudentSPI(user.email);
+        // Even if spiData is empty, we don't throw an exception
+        if (!mounted) return;
+        setState(() {
+          _spiData = spiData; // This will be an empty list if no data was found
+          _isLoadingSPI = false;
+          debugPrint('SPI data loaded successfully: ${spiData.length} items');
+        });
+        
+        // Also load semester SPI data for bar chart
+        _loadSemesterSPIData(user.enrollmentNumber);
+      } else {
+        debugPrint('User is null, cannot load SPI data');
+        if (!mounted) return;
+        setState(() {
+          _spiData = [];
+          _isLoadingSPI = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading SPI data: $e');
+      if (!mounted) return;
+      setState(() {
+        _spiData = []; // Set to empty list on error
+        _isLoadingSPI = false;
+      });
+    }
+  }
+  
+  Future<void> _loadSemesterSPIData(String enrollmentNumber) async {
+    try {
+      debugPrint('Fetching semester SPI data for enrollment: $enrollmentNumber');
+      final data = await _academicService.getSemesterSPIByEnrollment(enrollmentNumber);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _semesterSPIData = data;
+        _isLoadingSemesterSPI = false;
+        debugPrint('Semester SPI data loaded: ${data.length} semesters');
+      });
+    } catch (e) {
+      debugPrint('Error loading semester SPI data: $e');
+      if (!mounted) return;
+      setState(() {
+        _semesterSPIData = [];
+        _isLoadingSemesterSPI = false;
+      });
+    }
+  }
+
   Future<void> _loadUserData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('userEmail') ?? '';
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
       
-      if (userEmail.isNotEmpty) {
-        // Extract name from email - only take alphabetic characters before @
-        final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(userEmail.split('@').first);
-        if (nameMatch != null && nameMatch.group(0) != null) {
-          setState(() {
-            _userName = nameMatch.group(0)!;
-            // Capitalize first letter
-            _userName = _userName[0].toUpperCase() + _userName.substring(1);
-          });
-        }
+      if (user != null) {
+        setState(() {
+          _userName = user.name;
+        });
       }
     } catch (e) {
       debugPrint('Error loading user data: $e');
@@ -188,6 +248,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    _loadSPIData();
     _graphAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -312,14 +373,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               ),
                             ],
                           ),
-                          child: CircleAvatar(
-                            radius: 24,
-                            backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
-                            child: Icon(
-                              Icons.person,
-                              color: Theme.of(context).textTheme.bodyLarge!.color,
-                              size: 32,
-                            ),
+                          child: FutureBuilder<SharedPreferences>(
+                            future: SharedPreferences.getInstance(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data != null) {
+                                final prefs = snapshot.data!;
+                                final userEmail = prefs.getString('userEmail') ?? '';
+                                final imagePath = prefs.getString('${userEmail}_profileImage');
+                                
+                                if (imagePath != null && imagePath.isNotEmpty) {
+                                  final file = File(imagePath);
+                                  return CircleAvatar(
+                                    radius: 24,
+                                    backgroundImage: FileImage(file),
+                                  );
+                                }
+                              }
+                              
+                              return CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                                child: Icon(
+                                  Icons.person,
+                                  color: Theme.of(context).textTheme.bodyLarge!.color,
+                                  size: 32,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -399,6 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _buildIconButton('Expertise', Icons.pie_chart, _activeGraph == 'expertise', () => _switchGraph('expertise')),
         _buildIconButton('Subjects', Icons.radar, _activeGraph == 'subjects', () => _switchGraph('subjects')),
         _buildIconButton('Languages', Icons.code, _activeGraph == 'languages', () => _switchGraph('languages')),
+        _buildIconButton('Semesters', Icons.insert_chart, _activeGraph == 'semesters', () => _switchGraph('semesters')),
       ],
     );
   }
@@ -838,7 +919,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black87,
+                                color: isDark ? Colors.white : Colors.black,
                               ),
                             ),
                             Text(
@@ -1087,7 +1168,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               Text(
                                 club['name'],
                                 style: TextStyle(
-                                  color: isDark ? Colors.white : Colors.black87,
+                                  color: isDark ? Colors.white : Colors.black,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 20,
                                 ),
@@ -1120,7 +1201,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   Text(
                                     'Code: ${club['code']}',
                                     style: TextStyle(
-                                      color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
+                                      color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
                                       fontSize: 12,
                                     ),
                                   ),
@@ -1139,10 +1220,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Description',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -1151,15 +1232,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Text(
                             club['description'],
                             style: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
+                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
                               fontSize: 14,
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Text(
+                          Text(
                             'Club Link',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -1174,10 +1255,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Text(
+                          Text(
                             'Your Role',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -1186,7 +1267,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Text(
                             club['role'],
                             style: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black87,
+                              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
                               fontSize: 14,
                             ),
                           ),
@@ -1231,25 +1312,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.info_outline,
+                        Icons.dashboard,
                         size: 18,
-                        color: Color(0xFF03A9F4),
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Text(
                       'Overview',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 _buildInfoRow('Current CGPA', '8.8'),
-                _buildInfoRow('Completed Credits', '120/180'),
                 _buildInfoRow('Current Semester', '6th'),
                 _buildInfoRow('Academic Rank', '5th'),
                 _buildInfoRow('Non-Academic Rank', '3rd'),
@@ -1273,15 +1353,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black87),
+              color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white.withOpacity(0.7) 
+                : Colors.black.withOpacity(0.7),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white 
+                : Colors.black,
             ),
           ),
         ],
@@ -1307,31 +1391,171 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String _getChartTitle() {
     switch (_activeGraph) {
       case 'sgpa':
-        return 'SGPA Progression';
+        return 'Semester Performance';
       case 'expertise':
         return 'Domain Expertise';
       case 'subjects':
-        return 'Current Semester Subjects';
+        return 'Subject Performance';
       case 'languages':
         return 'Programming Languages';
+      case 'semesters':
+        return 'All Semester SPIs';
       default:
-        return 'Chart';
+        return 'Performance Overview';
     }
   }
 
   Widget _getActiveChart() {
     switch (_activeGraph) {
-      case 'sgpa':
-        return _buildAnimatedBarChart();
       case 'expertise':
         return _buildDomainExpertiseChart();
       case 'subjects':
-        return _buildAnimatedRadarChart();
+        return _buildAnimatedRadarChart(); 
       case 'languages':
         return _buildProgrammingLanguagesChart();
+      case 'semesters':
+        return _buildSemesterSPIChart();
+      case 'sgpa':
       default:
-        return Container();
+        return _buildDomainExpertiseChart(); // Temporary, replace with SGPA chart
     }
+  }
+
+  // Build semester SPI bar chart
+  Widget _buildSemesterSPIChart() {
+    if (_isLoadingSemesterSPI) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_semesterSPIData.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bar_chart_outlined, size: 60, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No semester data available',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Sort data by semester
+    _semesterSPIData.sort((a, b) => (a['semester'] as int).compareTo(b['semester'] as int));
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.center,
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
+              tooltipPadding: const EdgeInsets.all(8),
+              tooltipMargin: 8,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final semester = _semesterSPIData[groupIndex]['semester'];
+                final spi = _semesterSPIData[groupIndex]['spi'];
+                final cpi = _semesterSPIData[groupIndex]['cpi'];
+                return BarTooltipItem(
+                  'Semester $semester\n',
+                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  children: [
+                    TextSpan(text: 'SPI: ${spi.toStringAsFixed(2)}\n', style: const TextStyle(color: Colors.yellow)),
+                    TextSpan(text: 'CPI: ${cpi.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent)),
+                  ],
+                );
+              },
+            ),
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  if (value.toInt() >= 0 && value.toInt() < _semesterSPIData.length) {
+                    return SideTitleWidget(
+                      axisSide: meta.axisSide,
+                      child: Text(
+                        'S${_semesterSPIData[value.toInt()]['semester']}',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    );
+                  }
+                  return const SizedBox();
+                },
+                reservedSize: 28,
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    child: Text(
+                      value.toString(),
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  );
+                },
+              ),
+            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          gridData: FlGridData(
+            show: true,
+            horizontalInterval: 1,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.white.withOpacity(0.1),
+              strokeWidth: 1,
+            ),
+            drawVerticalLine: false,
+          ),
+          borderData: FlBorderData(show: false),
+          maxY: 10, // Maximum SPI is 10
+          barGroups: List.generate(_semesterSPIData.length, (index) {
+            final data = _semesterSPIData[index];
+            final spi = data['spi'] as double;
+            
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: spi,
+                  color: _getSPIColor(spi),
+                  width: 20,
+                  borderRadius: BorderRadius.circular(4),
+                  backDrawRodData: BackgroundBarChartRodData(
+                    show: true,
+                    toY: 10,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+        swapAnimationDuration: const Duration(milliseconds: 750),
+      ),
+    );
+  }
+  
+  // Get a color based on SPI value
+  Color _getSPIColor(double spi) {
+    if (spi >= 9) return Colors.greenAccent;
+    if (spi >= 8) return Colors.green;
+    if (spi >= 7) return Colors.lime;
+    if (spi >= 6) return Colors.amber;
+    if (spi >= 5) return Colors.orange;
+    return Colors.redAccent;
   }
 
   Widget _buildAnimatedRadarChart() {
@@ -1340,25 +1564,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       animation: _graphAnimationController,
       builder: (context, child) {
         return SizedBox(
-          height: 200, // Decreased from 220 to make it even smaller
+          height: 150, // Decreased from 200 to make it even smaller
           child: CustomPaint(
             painter: RadarChartPainter(
               subjects: ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'],
               scores: [
                 85 * _graphAnimationController.value,
                 75 * _graphAnimationController.value,
-                90 * _graphAnimationController.value,
                 80 * _graphAnimationController.value,
                 70 * _graphAnimationController.value,
+                65 * _graphAnimationController.value,
                 85 * _graphAnimationController.value,
               ],
               maxScore: 100,
               backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
               lineColor: const Color(0xFF03A9F4),
               fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
+              colors: [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.teal],
               context: context,
             ),
-            size: const Size(double.infinity, 200), // Decreased from 220 to make it even smaller
+            size: const Size(double.infinity, 150), // Decreased from 200 to make it even smaller
           ),
         );
       },
@@ -1384,7 +1609,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               barTouchData: BarTouchData(
                 enabled: true,
                 touchTooltipData: BarTouchTooltipData(
-                  tooltipBgColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.8) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.8) : Colors.black87),
+                  tooltipBgColor: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
                   tooltipPadding: const EdgeInsets.all(8),
                   tooltipMargin: 8,
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -1414,7 +1639,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     return BarTooltipItem(
                       '$semester\n',
                       TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -1422,7 +1647,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         TextSpan(
                           text: '${(rod.toY * value).toStringAsFixed(1)}',
                           style: TextStyle(
-                            color: Colors.yellow,
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.yellow : Colors.blue,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -1524,9 +1749,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 show: false,
               ),
               barGroups: [
-                _buildBarGroup(0, 8.2 * value),
+                _buildBarGroup(0, 6.5 * value),
                 _buildBarGroup(1, 8.5 * value),
-                _buildBarGroup(2, 7.8 * value),
+                _buildBarGroup(2, 2.9 * value),
                 _buildBarGroup(3, 9.1 * value),
                 _buildBarGroup(4, 8.9 * value),
                 _buildBarGroup(5, 9.3 * value),
@@ -1539,12 +1764,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   BarChartGroupData _buildBarGroup(int x, double y) {
+    // Define colors based on SGPA value
+    Color getBarColor(double sgpa) {
+      if (sgpa >= 7.0) return Colors.green;
+      if (sgpa >= 4.0) return Colors.orange;
+      return Colors.red;
+    }
+
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
           toY: y,
-          color: Colors.blue,
+          color: getBarColor(y),
           width: 22,
           borderRadius: BorderRadius.circular(4),
           backDrawRodData: BackgroundBarChartRodData(
@@ -1635,27 +1867,58 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 }
 
-// Custom painter for radar chart
 class RadarChartPainter extends CustomPainter {
   final List<String> subjects;
   final List<double> scores;
   final double maxScore;
   final Color backgroundColor;
-  final Color lineColor;
   final Color fillColor;
-  final List<double>? labelOffset;
+  final Color lineColor;
+  final List<Color>? colors;
   final BuildContext context;
+  
+  // Define paint objects once to avoid recreating them
+  late final Paint _backgroundPaint;
+  late final Paint _fillPaint;
+  late final Paint _linePaint;
+  late final Paint _axisPaint;
+  late final Paint _pointOutlinePaint;
+  late final Paint _pointFillPaint;
 
   RadarChartPainter({
     required this.subjects,
     required this.scores,
     required this.maxScore,
     required this.backgroundColor,
-    required this.lineColor,
     required this.fillColor,
-    this.labelOffset,
+    required this.lineColor,
+    this.colors,
     required this.context,
-  });
+  }) {
+    // Initialize Paint objects
+    _backgroundPaint = Paint()..color = backgroundColor;
+    
+    _fillPaint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
+    
+    _linePaint = Paint()
+      ..color = lineColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+      
+    _axisPaint = Paint()
+      ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? 
+               (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black87)
+      ..strokeWidth = 1;
+    
+    _pointOutlinePaint = Paint()
+      ..color = Theme.of(context).textTheme.bodyLarge!.color ?? 
+               (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87);
+    
+    _pointFillPaint = Paint()
+      ..color = lineColor;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1664,19 +1927,16 @@ class RadarChartPainter extends CustomPainter {
     final radius = size.width * 0.35; // Decreased from 0.4
     
     // Draw background
-    canvas.drawCircle(center, radius, Paint()..color = backgroundColor);
+    canvas.drawCircle(center, radius, _backgroundPaint);
     
     // Draw concentric circles
     for (int i = 1; i <= 5; i++) {
       final circleRadius = radius * (i / 5);
-      canvas.drawCircle(
-        center,
-        circleRadius,
-        Paint()
-          ..color = isDark ? Colors.white.withOpacity(0.1) : Colors.black87
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
+      final concCirclePaint = Paint()
+        ..color = isDark ? Colors.white.withOpacity(0.1) : Colors.black87
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      canvas.drawCircle(center, circleRadius, concCirclePaint);
     }
     
     // Draw polygon for each data point
@@ -1696,21 +1956,10 @@ class RadarChartPainter extends CustomPainter {
     
     // Draw filled polygon
     final path = Path()..addPolygon(points, true);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = fillColor
-        ..style = PaintingStyle.fill,
-    );
+    canvas.drawPath(path, _fillPaint);
     
     // Draw polygon outline
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = lineColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+    canvas.drawPath(path, _linePaint);
     
     // Draw axis lines and labels
     for (int i = 0; i < sides; i++) {
@@ -1718,16 +1967,14 @@ class RadarChartPainter extends CustomPainter {
       final dx = center.dx + radius * math.cos(angle);
       final dy = center.dy + radius * math.sin(angle);
       
-      canvas.drawLine(center, Offset(dx, dy), Paint()
-        ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black87)
-        ..strokeWidth = 1);
+      canvas.drawLine(center, Offset(dx, dy), _axisPaint);
       
       // Draw subject labels with offset adjustment if provided
       double offsetX = 0;
       double offsetY = 0;
       
-      if (labelOffset != null && i < labelOffset!.length) {
-        offsetX = radius * 0.2 * labelOffset![i];
+      if (colors != null && i < colors!.length) {
+        offsetX = radius * 0.2 * 0.5;
       }
       
       final labelDx = center.dx + (radius + 20) * math.cos(angle) + offsetX;
@@ -1741,7 +1988,7 @@ class RadarChartPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: subjects[i],
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+          color: colors != null ? colors![i] : Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -1759,8 +2006,8 @@ class RadarChartPainter extends CustomPainter {
     
     // Draw points
     for (final point in points) {
-      canvas.drawCircle(point, 4, Paint()..color = Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87));
-      canvas.drawCircle(point, 3, Paint()..color = lineColor);
+      canvas.drawCircle(point, 4, _pointOutlinePaint);
+      canvas.drawCircle(point, 3, _pointFillPaint);
     }
   }
 

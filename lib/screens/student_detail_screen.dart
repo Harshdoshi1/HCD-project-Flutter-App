@@ -3,15 +3,19 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 
 class StudentDetailScreen extends StatelessWidget {
-  final String name;
-  final String rank;
-  final String details;
+  final String studentName;
+  final String studentEmail;
+  final String studentEnrollment;
+  final String studentDetails;
+  final VoidCallback toggleTheme;
 
   const StudentDetailScreen({
     Key? key,
-    required this.name,
-    required this.rank,
-    required this.details,
+    required this.studentName,
+    required this.studentEmail,
+    required this.studentEnrollment,
+    required this.studentDetails,
+    required this.toggleTheme,
   }) : super(key: key);
 
   @override
@@ -26,7 +30,7 @@ class StudentDetailScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          name, 
+          studentName, 
           style: TextStyle(
             color: isDark ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,
@@ -59,7 +63,7 @@ class StudentDetailScreen extends StatelessWidget {
                 children: [
                   // Profile image
                   Hero(
-                    tag: 'profile-$name',
+                    tag: 'profile-$studentName',
                     child: Container(
                       width: 120,
                       height: 120,
@@ -95,10 +99,9 @@ class StudentDetailScreen extends StatelessWidget {
                     title: 'Academic Profile',
                     icon: Icons.school,
                     children: [
-                      _buildInfoRow(context, 'Rank', rank, Icons.leaderboard),
+                      _buildInfoRow(context, 'Enrollment', studentEnrollment, Icons.badge),
                       _buildInfoRow(context, 'Department', 'Information & Communication Technology', Icons.business),
-                      _buildInfoRow(context, 'Semester', '6th', Icons.calendar_today),
-                      _buildInfoRow(context, 'CGPA', '9.2/10', Icons.grade),
+                      _buildInfoRow(context, 'Details', studentDetails, Icons.info_outline),
                     ],
                   ),
                   
@@ -110,7 +113,7 @@ class StudentDetailScreen extends StatelessWidget {
                     title: 'Contact',
                     icon: Icons.contact_mail,
                     children: [
-                      _buildInfoRow(context, 'Email', '${name.toLowerCase().replaceAll(' ', '.')}@marwadiuniversity.ac.in', Icons.email),
+                      _buildInfoRow(context, 'Email', studentEmail, Icons.email),
                       _buildInfoRow(context, 'Phone', '+91 9876543210', Icons.phone),
                     ],
                   ),

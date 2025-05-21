@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:convert';
+import '../services/student_service.dart';
+import '../models/student_ranking_model.dart';
 import 'student_detail_screen.dart';
 
 class RankingsScreen extends StatefulWidget {
@@ -19,42 +22,43 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   late Animation<double> _fadeAnimation;
   TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
-  final List<String> studentNames = [
-    'Harsh Doshi',
-    'Krish Mamtora',
-    'Rishit Rathod',
-    'Ritesh Sanchala',
-    'Fenil Vadher',
-    'Umnag Hirani',
-    'Jay Mangukiya',
-    'Aryan Mahida',
-    'Harshvardhan Soni'
-  ];
-
-  final List<String> academicSubtitles = [
-    'SGPA: 9.8 | Sem: 5th',
-    'SGPA: 9.7 | Sem: 5th',
-    'SGPA: 9.6 | Sem: 5th',
-    'SGPA: 9.5 | Sem: 5th',
-    'SGPA: 9.4 | Sem: 5th',
-    'SGPA: 9.3 | Sem: 5th',
-    'SGPA: 9.2 | Sem: 5th',
-    'SGPA: 9.1 | Sem: 5th',
-    'SGPA: 9.0 | Sem: 5th',
-  ];
-
-  final List<String> nonAcademicSubtitles = [
-    'Points: 1200',
-    'Points: 1100',
-    'Points: 950',
-    'Points: 900',
-    'Points: 850',
-    'Points: 800',
-    'Points: 750',
-    'Points: 700',
-    'Points: 650',
-  ];
+  
+  // Student data
+  final StudentService _studentService = StudentService();
+  List<StudentRanking> _students = [];
+  bool _isLoading = true;
+  String? _error;
+  
+  // Filtered lists for different tabs
+  List<StudentRanking> get _filteredStudents {
+    if (_searchQuery.isEmpty) {
+      return _students;
+    }
+    return _students.where((student) =>
+      student.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      student.enrollmentNumber.toLowerCase().contains(_searchQuery.toLowerCase())
+    ).toList();
+  }
+  
+  // Get students sorted by hardware + software points
+  List<StudentRanking> get _studentsByPoints {
+    final List<StudentRanking> sortedList = List.from(_filteredStudents);
+    sortedList.sort((a, b) => b.totalPoints.compareTo(a.totalPoints));
+    return sortedList;
+  }
+  
+  // Get students sorted by CPI
+  List<StudentRanking> get _studentsByCPI {
+    final List<StudentRanking> sortedList = List.from(_filteredStudents);
+    sortedList.sort((a, b) {
+      // Handle null CPI values
+      if (a.cpi == null && b.cpi == null) return 0;
+      if (a.cpi == null) return 1;
+      if (b.cpi == null) return -1;
+      return b.cpi!.compareTo(a.cpi!);
+    });
+    return sortedList;
+  }
 
   @override
   void initState() {
@@ -78,6 +82,47 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
 
     _fadeController.forward();
+    
+    // Fetch all students data
+    _fetchStudents();
+    
+    // Listen for search changes
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+  
+  // Fetch all students from backend
+  Future<void> _fetchStudents() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    
+    try {
+      final studentsList = await _studentService.getAllStudents();
+      
+      // Convert raw data to StudentRanking objects
+      final List<StudentRanking> students = [];
+      for (var student in studentsList) {
+        students.add(StudentRanking.fromJson(student));
+      }
+      
+      setState(() {
+        _students = students;
+        _isLoading = false;
+      });
+      
+      print('Fetched ${_students.length} students');
+    } catch (e) {
+      print('Error fetching students: $e');
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -263,59 +308,110 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   Widget _buildRankingList(bool isAcademic) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Filter students based on search query
-    List<int> filteredIndices = [];
-    for (int i = 0; i < studentNames.length; i++) {
-      if (_searchQuery.isEmpty || 
-          studentNames[i].toLowerCase().contains(_searchQuery) ||
-          (isAcademic && academicSubtitles[i].toLowerCase().contains(_searchQuery)) ||
-          (!isAcademic && nonAcademicSubtitles[i].toLowerCase().contains(_searchQuery))) {
-        filteredIndices.add(i);
-      }
+    // Get the appropriate student list based on ranking type
+    final students = isAcademic ? _studentsByCPI : _studentsByPoints;
+    
+    // Show loading indicator while data is being fetched
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+    
+    // Show error message if there was an error fetching data
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 48),
+            SizedBox(height: 16),
+            Text(
+              'Error loading students',
+              style: TextStyle(
+                fontSize: 18, 
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchStudents,
+              child: Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Handle empty results
+    if (students.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: isDark ? Colors.white54 : Colors.black38,
+            ),
+            SizedBox(height: 16),
+            Text(
+              _searchQuery.isEmpty
+                ? 'No students found'
+                : 'No students match "$_searchQuery"',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      );
     }
     
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: filteredIndices.isEmpty
-          ? Center(
-              child: Text(
-                'No students found',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                  fontSize: 16,
-                ),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filteredIndices.length,
-              itemBuilder: (context, index) {
-                final originalIndex = filteredIndices[index];
-                final rank = originalIndex + 1;
-                final name = studentNames[originalIndex];
-                final subtitle = isAcademic 
-                    ? academicSubtitles[originalIndex] 
-                    : nonAcademicSubtitles[originalIndex];
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: students.length,
+        itemBuilder: (context, index) {
+          final student = students[index];
+          final rank = index + 1;
+          final name = student.name;
+          final subtitle = isAcademic
+              ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester}'
+              : 'HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | Total: ${student.totalPoints}';
                 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildStudentCard(rank, name, subtitle, isDark),
-                );
-              },
-            ),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildStudentCard(rank, name, subtitle, isDark, student),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildStudentCard(int rank, String name, String subtitle, bool isDark) {
+  Widget _buildStudentCard(int rank, String name, String subtitle, bool isDark, StudentRanking student) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => StudentDetailScreen(
-              name: name,
-              rank: '#$rank',
-              details: subtitle,
+              studentName: name,
+              studentEmail: student.email,
+              studentEnrollment: student.enrollmentNumber,
+              studentDetails: 'Semester: ${student.currentSemester} | HW Points: ${student.hardwarePoints} | SW Points: ${student.softwarePoints} | CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'}',
+              toggleTheme: widget.toggleTheme,
             ),
           ),
         );

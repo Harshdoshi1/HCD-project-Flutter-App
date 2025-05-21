@@ -1,19 +1,26 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:5001/api';
+  // Force using localhost for web browsers
+  static final String baseUrl = 'http://localhost:5001/api';
 
   Future<Map<String, dynamic>> login(String email, String enrollmentNumber, BuildContext context) async {
     try {
       print('Attempting login with email: $email and enrollment: $enrollmentNumber');
       
+      // Hardcode the login URL for web browser compatibility
+      final loginUrl = 'http://localhost:5001/api/students/login';
+      print('Using login URL: $loginUrl');
+      
       final response = await http.post(
-        Uri.parse('$baseUrl/students/login'),
+        Uri.parse(loginUrl),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'email': email,

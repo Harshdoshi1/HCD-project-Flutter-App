@@ -2,17 +2,17 @@ import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 
 class UserProvider with ChangeNotifier {
-  User? _currentUser;
+  User? _user;
 
-  User? get currentUser => _currentUser;
+  User? get user => _user;
 
   void setUser(User user) {
-    _currentUser = user;
+    _user = user;
     notifyListeners();
   }
 
   void clearUser() {
-    _currentUser = null;
+    _user = null;
     notifyListeners();
   }
 }

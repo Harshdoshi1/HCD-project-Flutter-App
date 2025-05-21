@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
 import '../services/academic_service.dart';
+import '../services/student_service.dart';
 import 'splash_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -30,6 +31,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   File? _profileImage;
   AcademicData? _academicData;
   String? _academicError;
+  
+  // Student data
+  final StudentService _studentService = StudentService();
+  Map<String, dynamic>? _studentCPIData;
+  bool _isLoadingStudentData = false;
+  String? _studentDataError;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
@@ -53,17 +60,46 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
     );
     _fadeController.forward();
-    _bioController.text = 'Passionate developer with focus on creating beautiful mobile experiences';
     
-    // Initialize user data from provider
-    _currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
+    // Retrieve user from provider
+    _currentUser = Provider.of<UserProvider>(context, listen: false).user;
     if (_currentUser != null) {
       _nameController.text = _currentUser!.name;
       _emailController.text = _currentUser!.email;
+      
+      // Fetch student CPI/SPI data
+      _fetchStudentData();
+    }
+  }
+  
+  // Fetch student academic data
+  Future<void> _fetchStudentData() async {
+    setState(() {
+      _isLoadingStudentData = true;
+      _studentDataError = null;
+    });
+    
+    try {
+      // Fetch student CPI/SPI data using email
+      final studentData = await _studentService.getStudentAcademicDataByEmail(_currentUser!.email);
+      
+      setState(() {
+        _studentCPIData = studentData;
+        _isLoadingStudentData = false;
+      });
+      
+      print('Student data fetched successfully: $_studentCPIData');
+    } catch (e) {
+      print('Error fetching student data: $e');
+      setState(() {
+        _studentDataError = e.toString();
+        _isLoadingStudentData = false;
+      });
     }
     
     _loadProfileImage();
@@ -80,9 +116,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     super.didChangeDependencies();
     // Update user data when it changes
     final userProvider = Provider.of<UserProvider>(context, listen: true);
-    if (userProvider.currentUser != _currentUser) {
+    if (userProvider.user != _currentUser) {
       setState(() {
-        _currentUser = userProvider.currentUser;
+        _currentUser = userProvider.user;
         if (_currentUser != null) {
           _nameController.text = _currentUser!.name;
           _emailController.text = _currentUser!.email;
@@ -981,14 +1017,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (!mounted) return;
       
       setState(() {
-        if (academicData != null) {
-          _academicData = academicData;
-          _academicError = null;
-          debugPrint('Academic data updated for enrollment: ${academicData.enrollmentNumber}');
-        } else {
-          _academicError = 'No academic records found';
-          debugPrint('No academic data received');
-        }
+        // academicData is always non-null now (our service returns default values)
+        _academicData = academicData;
+        _academicError = null;
+        debugPrint('Academic data updated for enrollment: ${academicData.enrollmentNumber}');
       });
     } catch (e) {
       debugPrint('Error loading academic data: $e');

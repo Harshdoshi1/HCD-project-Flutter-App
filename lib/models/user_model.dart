@@ -5,6 +5,9 @@ class User {
   final String enrollmentNumber;
   final int currentSemester;
   final String role;
+  final int hardwarePoints;
+  final int softwarePoints;
+  final String? batch;
 
   User({
     required this.id,
@@ -13,16 +16,29 @@ class User {
     required this.enrollmentNumber,
     required this.currentSemester,
     required this.role,
+    this.hardwarePoints = 0,
+    this.softwarePoints = 0,
+    this.batch,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    print('Parsing user from JSON: $json');
     return User(
-      id: json['id'].toString(),
-      name: json['name'] as String,
-      email: json['email'] as String,
-      enrollmentNumber: json['enrollmentNumber'] as String,
-      currentSemester: int.parse(json['currnetsemester'].toString()),
-      role: json['role'] as String,
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      enrollmentNumber: json['enrollmentNumber']?.toString() ?? '',
+      currentSemester: json['currentSemester'] != null 
+          ? int.tryParse(json['currentSemester'].toString()) ?? 0 
+          : 0,
+      role: json['role']?.toString() ?? 'student',
+      hardwarePoints: json['hardwarePoints'] != null
+          ? int.tryParse(json['hardwarePoints'].toString()) ?? 0
+          : 0,
+      softwarePoints: json['softwarePoints'] != null
+          ? int.tryParse(json['softwarePoints'].toString()) ?? 0
+          : 0,
+      batch: json['batch']?.toString(),
     );
   }
 
@@ -31,7 +47,10 @@ class User {
     'name': name,
     'email': email,
     'enrollmentNumber': enrollmentNumber,
-    'currnetsemester': currentSemester,
+    'currentSemester': currentSemester,
     'role': role,
+    'hardwarePoints': hardwarePoints,
+    'softwarePoints': softwarePoints,
+    'batch': batch,
   };
 }
