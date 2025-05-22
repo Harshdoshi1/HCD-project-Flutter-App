@@ -231,7 +231,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
             ),
             decoration: InputDecoration(
-              labelText: 'Enrollment Number',
+              labelText: 'Password',
               prefixIcon: Icon(
                 Icons.numbers,
                 color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,

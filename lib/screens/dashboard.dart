@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:convert';
 import '../providers/user_provider.dart';
 import '../services/academic_service.dart';
+import '../services/student_service.dart';
 import 'profile_screen.dart';
 import '../constants/app_theme.dart';
 
@@ -39,6 +40,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late AnimationController _graphAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  
+  // Subject data for radar chart
+  bool _isLoadingSubjectData = true;
+  List<String> _currentSemesterSubjects = [];
+  List<double> _currentSemesterScores = [];
+  List<Color> _subjectColors = [];
+  int _currentSemesterNumber = 0;
+  final Map<String, double> _gradeToScore = {
+    'AA': 100.0, 'AB': 90.0, 'BB': 80.0, 
+    'BC': 70.0, 'CC': 60.0, 'CD': 50.0, 
+    'DD': 40.0, 'FF': 0.0, 'NA': 0.0
+  };
 
   void _switchGraph(String newGraph) {
     if (_activeGraph != newGraph) {
@@ -239,6 +252,116 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  Future<void> _loadSubjectData(String email) async {
+    print('Starting _loadSubjectData for email: $email');
+    setState(() {
+      _isLoadingSubjectData = true;
+    });
+    
+    try {
+      // Clear previous data
+      _currentSemesterSubjects.clear();
+      _currentSemesterScores.clear();
+      _subjectColors.clear();
+      
+      // Define fallback color list
+      final List<Color> baseColors = [
+        Colors.blue,
+        Colors.red,
+        Colors.green,
+        Colors.orange,
+        Colors.purple,
+        Colors.teal,
+        Colors.amber,
+        Colors.pink,
+        Colors.indigo,
+        Colors.cyan,
+      ];
+
+      // Use the API to get actual subject data
+      print('Fetching subject data from API for email: $email');
+      final studentService = StudentService();
+      final response = await studentService.getStudentComponentMarksAndSubjects(email);
+      
+      if (response != null && response.containsKey('semesters') && response['semesters'] is List) {
+        final List<dynamic> semesters = response['semesters'];
+        
+        if (semesters.isNotEmpty) {
+          print('API returned ${semesters.length} semesters');
+          
+          // Find current semester (highest semester number)
+          int highestSemester = 0;
+          Map<String, dynamic>? currentSemesterData;
+          
+          for (var semesterData in semesters) {
+            if (semesterData.containsKey('semesterNumber')) {
+              final int semesterNumber = int.tryParse(semesterData['semesterNumber'].toString()) ?? 0;
+              if (semesterNumber > highestSemester) {
+                highestSemester = semesterNumber;
+                currentSemesterData = semesterData;
+              }
+            }
+          }
+          
+          // Set current semester number
+          _currentSemesterNumber = highestSemester;
+          
+          // Process subject data for the current semester
+          if (currentSemesterData != null && 
+              currentSemesterData.containsKey('subjects') && 
+              currentSemesterData['subjects'] is List) {
+            
+            final List<dynamic> subjects = currentSemesterData['subjects'];
+            print('Found ${subjects.length} subjects for semester $_currentSemesterNumber');
+            
+            // Process each subject
+            for (int i = 0; i < subjects.length; i++) {
+              var subject = subjects[i];
+              if (subject is Map<String, dynamic>) {
+                String subjectName = subject['subjectName'] ?? subject['name'] ?? 'Unknown';
+                String grade = subject['grade'] ?? 'NA';
+                
+                // Skip subjects with no grade
+                if (grade == 'NA' || grade.isEmpty) continue;
+                
+                // Convert grade to score
+                double score = _gradeToScore[grade] ?? 0.0;
+                
+                // Add subject to lists
+                _currentSemesterSubjects.add(subjectName);
+                _currentSemesterScores.add(score);
+                
+                // Add color for the subject (cycling through baseColors)
+                _subjectColors.add(baseColors[i % baseColors.length]);
+                
+                print('Added subject: $subjectName with grade: $grade, score: $score');
+              }
+            }
+          }
+        }
+      }
+      
+      // If no data was found from API, we don't use any fallback hardcoded data
+      if (_currentSemesterSubjects.isEmpty) {
+        print('No data from API, no fallback data will be used');
+        // Keep the lists empty to show the "No subject data available" message
+      }
+    } catch (e) {
+      print('Error in _loadSubjectData: $e');
+      // Keep lists empty on error to show "No Data" message
+      _currentSemesterSubjects = [];
+      _currentSemesterScores = [];
+      _subjectColors = [];
+      _currentSemesterNumber = 0;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingSubjectData = false;
+        });
+      }
+    }
+  }
+
   Future<void> _loadUserData() async {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -247,7 +370,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (user != null) {
         setState(() {
           _userName = user.name;
+          _enrollmentNumber = user.enrollmentNumber;
         });
+        
+        // Now that we have the enrollment number, fetch additional data
+        if (_enrollmentNumber != null) {
+          await _loadSemesterSPIData(_enrollmentNumber!);
+          
+          // Load subject data for radar chart
+          if (user.email != null) {
+            await _loadSubjectData(user.email!);
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error loading user data: $e');
@@ -368,31 +502,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _loadSPIData();
-    _loadActivityPoints();
+
+    // Initialize animation controller
     _graphAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 800),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
       CurvedAnimation(
-        parent: _graphAnimationController, 
-        curve: Curves.easeIn
+        parent: _graphAnimationController,
+        curve: Curves.easeInOut,
       ),
     );
 
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-      CurvedAnimation(parent: _graphAnimationController, curve: Curves.easeOut),
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0.5, 0),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _graphAnimationController,
+        curve: Curves.easeOutCubic,
+      ),
     );
-
+    
+    // Define subject colors
+    _subjectColors = [
+      Colors.blue, Colors.green, Colors.purple, 
+      Colors.orange, Colors.red, Colors.teal,
+      Colors.pink, Colors.amber, Colors.indigo,
+      Colors.cyan, Colors.deepOrange, Colors.lightGreen,
+    ];
+    
+    // Start animation
     _graphAnimationController.forward();
+    
+    // Load user data, SPI data, and activity points
+    _loadUserData();
+    _loadSPIData();
+    _loadActivityPoints();
     
     // Set random daily quote
     _dailyQuote = _dailyQuotes[DateTime.now().day % _dailyQuotes.length];
-    
-    // Load user data from shared preferences
-    _loadUserData();
   }
 
   @override
@@ -1552,6 +1706,53 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
   
+  // Helper method to build a legend item for the activity points chart
+  Widget _buildLegendItem({
+    required Color color,
+    required String title,
+    required int points,
+    required String percentage,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Color indicator
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        // Text info
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
+            ),
+            Text(
+              '$points pts ($percentage%)',
+              style: TextStyle(
+                fontSize: 9,
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
   Widget _buildActivityPointsChart() {
     if (_isLoadingActivityPoints) {
       return const Center(
@@ -1605,81 +1806,125 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final Color cocurricularColor = const Color(0xFF4CAF50); // Green
     final Color extracurricularColor = const Color(0xFF2196F3); // Blue
     
-    return Center(
-      child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: 0.0, end: 1.0),
-        duration: const Duration(milliseconds: 1500),
-        curve: Curves.elasticOut,
-        builder: (context, value, child) {
-          return SizedBox(
-            height: 180,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Animated pie chart
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 35,
-                    sections: [
-                      PieChartSectionData(
-                        color: cocurricularColor,
-                        value: _cocurricularPoints.toDouble() * value,
-                        title: '$cocurricularPercentage%',
-                        radius: 70,
-                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        badgeWidget: _cocurricularPoints > _extracurricularPoints ? 
-                            _buildBadge(Icons.emoji_events, cocurricularColor) : null,
-                        badgePositionPercentageOffset: 1.1,
-                      ),
-                      PieChartSectionData(
-                        color: extracurricularColor,
-                        value: _extracurricularPoints.toDouble() * value,
-                        title: '$extracurricularPercentage%',
-                        radius: 70,
-                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        badgeWidget: _extracurricularPoints > _cocurricularPoints ? 
-                            _buildBadge(Icons.emoji_events, extracurricularColor) : null,
-                        badgePositionPercentageOffset: 1.1,
-                      ),
-                    ],
-                  ),
-                  swapAnimationDuration: const Duration(milliseconds: 750),
-                  swapAnimationCurve: Curves.easeInOutQuint,
+    return Container(
+      width: double.infinity,
+      height: 230, // Adjusted overall height to fix overflow
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Chart title
+          Text(
+            'Activity Points Distribution',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Theme.of(context).textTheme.titleMedium?.color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Animated pie chart
+          SizedBox(
+            height: 120,
+            child: Center(
+              child: SizedBox(
+                width: 200, // Limited width for pie chart
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1500),
+                  curve: Curves.elasticOut,
+                  builder: (context, value, child) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Animated pie chart
+                        PieChart(
+                          PieChartData(
+                            sectionsSpace: 2,
+                            centerSpaceRadius: 25, // Even smaller center space
+                            sections: [
+                              PieChartSectionData(
+                                color: cocurricularColor,
+                                value: _cocurricularPoints.toDouble() * value,
+                                title: '',  // Remove percentage from slice
+                                radius: 45, // Reduced radius to match smaller width
+                                titleStyle: const TextStyle(fontSize: 0), // Hide title in pie
+                                badgeWidget: null, // Removed trophy badge
+                              ),
+                              PieChartSectionData(
+                                color: extracurricularColor,
+                                value: _extracurricularPoints.toDouble() * value,
+                                title: '', // Remove percentage from slice
+                                radius: 45, // Reduced radius to match smaller width
+                                titleStyle: const TextStyle(fontSize: 0), // Hide title in pie
+                                badgeWidget: null, // Removed trophy badge
+                              ),
+                            ],
+                          ),
+                          swapAnimationDuration: const Duration(milliseconds: 750),
+                          swapAnimationCurve: Curves.easeInOutQuint,
+                        ),
+                        
+                        // Center total counter
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              )
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${(totalPoints * value).toInt()}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const Text(
+                                'TOTAL',
+                                style: TextStyle(fontSize: 10, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-                
-                // Center total counter
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${(totalPoints * value).toInt()}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      const Text(
-                        'TOTAL',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
+              ),
+            ),
+          ),
+          // Legend - more compact horizontal layout
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Cocurricular legend item
+                _buildLegendItem(
+                  color: cocurricularColor,
+                  title: 'Cocurricular',
+                  points: _cocurricularPoints,
+                  percentage: cocurricularPercentage,
+                ),
+                // Extracurricular legend item
+                _buildLegendItem(
+                  color: extracurricularColor,
+                  title: 'Extracurricular',
+                  points: _extracurricularPoints,
+                  percentage: extracurricularPercentage,
                 ),
               ],
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -1960,37 +2205,173 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Colors.redAccent;
   }
 
+  // Helper method to convert score back to grade for display
+  String _getGradeFromScore(double score) {
+    if (score >= 95) return 'AA';
+    if (score >= 85) return 'AB';
+    if (score >= 75) return 'BB';
+    if (score >= 65) return 'BC';
+    if (score >= 55) return 'CC';
+    if (score >= 45) return 'CD';
+    if (score >= 35) return 'DD';
+    if (score > 0) return 'FF';
+    return 'NA';
+  }
+
   Widget _buildAnimatedRadarChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return AnimatedBuilder(
-      animation: _graphAnimationController,
-      builder: (context, child) {
-        return SizedBox(
-          height: 120, // Decreased from 150 to make it smaller
-          child: CustomPaint(
-            painter: RadarChartPainter(
-              subjects: ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'],
-              scores: [
-                85 * _graphAnimationController.value,
-                75 * _graphAnimationController.value,
-                80 * _graphAnimationController.value,
-                70 * _graphAnimationController.value,
-                65 * _graphAnimationController.value,
-                85 * _graphAnimationController.value,
-              ],
-              maxScore: 100,
-              backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
-              lineColor: const Color(0xFF03A9F4),
-              fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
-              colors: [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.teal],
-              context: context,
-            ),
-            size: const Size(double.infinity, 120), // Decreased from 150 to match the SizedBox height
-          ),
-        );
-      },
+
+  // Show loading indicator while fetching subject data
+  if (_isLoadingSubjectData) {
+    return const Center(
+      child: SizedBox(
+        height: 120,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
     );
   }
+  
+  // If there's no subject data available, show a message
+  if (_currentSemesterSubjects.isEmpty) {
+    return SizedBox(
+      height: 150,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 40,
+              color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.5),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No subject data available',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
+              ),
+            ),
+            Text(
+              'Please check your academic records',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Reset animation if needed
+  if (!_graphAnimationController.isAnimating && _graphAnimationController.value == 0) {
+    _graphAnimationController.forward();
+  }
+
+  // Create animated radar chart with actual subject data
+  return AnimatedBuilder(
+    animation: _graphAnimationController,
+    builder: (context, child) {
+      // Create animated scores for the radar chart
+      final List<double> animatedScores = _currentSemesterScores.map((score) {
+        return score * _graphAnimationController.value;
+      }).toList();
+      
+      return SizedBox(
+        height: 200, // Increased height for better visibility and legend
+        child: Column(
+          children: [
+            Expanded(
+              child: CustomPaint(
+                painter: RadarChartPainter(
+                  subjects: _currentSemesterSubjects,
+                  scores: animatedScores,
+                  maxScore: 100,
+                  backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
+                  lineColor: const Color(0xFF03A9F4),
+                  fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
+                  colors: _subjectColors,
+                  context: context,
+                ),
+                size: const Size(double.infinity, 140),
+              ),
+            ),
+            if (_currentSemesterNumber > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  'Semester $_currentSemesterNumber Subject Performance',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
+                  ),
+                ),
+              ),
+            // Add subject grade legend
+            if (_currentSemesterSubjects.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12.0,
+                  runSpacing: 4.0,
+                  children: List.generate(
+                    _currentSemesterSubjects.length,
+                    (index) {
+                      final grade = _getGradeFromScore(_currentSemesterScores[index]);
+                      return Chip(
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        labelPadding: EdgeInsets.zero,
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                        backgroundColor: _subjectColors[index].withOpacity(0.1),
+                        side: BorderSide(color: _subjectColors[index], width: 1),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _subjectColors[index],
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _currentSemesterSubjects[index],
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).textTheme.bodyMedium?.color,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '($grade)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(context).textTheme.bodySmall?.color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}  
 
   Widget _buildAnimatedBarChart() {
     return TweenAnimationBuilder<double>(

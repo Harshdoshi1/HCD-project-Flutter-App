@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
@@ -204,7 +204,8 @@ class StudentService {
       );
 
       print('Response status code: ${response.statusCode}');
-      print('Response body: ${response.body.substring(0, min(100, response.body.length))}...');
+    // Use dart:math min function with proper import
+    print('Response body: ${response.body.substring(0, math.min(100, response.body.length))}...');
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body) as Map<String, dynamic>;
