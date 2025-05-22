@@ -247,7 +247,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               // Header section
               Container(
                 width: double.infinity,
-                height: kToolbarHeight + 80,
+                padding: EdgeInsets.only(bottom: 8),
                 child: ClipRRect(
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -265,27 +265,30 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             SlideTransition(
                               position: _slideAnimation,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: _isLoading || _studentData == null
-                                  ? List.generate(1, (index) {
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                                        child: _buildSemesterChip(1),
-                                      );
-                                    })
-                                  : List.generate(_studentData!.semesters.length, (index) {
-                                      final semester = _studentData!.semesters[index].semesterNumber;
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                                        child: _buildSemesterChip(semester),
-                                      );
-                                    }),
+                              child: Container(
+                                height: 36, // Reduced height for the semester pills
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: _isLoading || _studentData == null
+                                    ? List.generate(1, (index) {
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          child: _buildSemesterChip(1),
+                                        );
+                                      })
+                                    : List.generate(_studentData!.semesters.length, (index) {
+                                        final semester = _studentData!.semesters[index].semesterNumber;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          child: _buildSemesterChip(semester),
+                                        );
+                                      }),
+                                  ),
                                 ),
                               ),
                             ),
@@ -341,7 +344,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected 
               ? (isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15))

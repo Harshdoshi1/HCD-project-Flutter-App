@@ -214,15 +214,15 @@ class AcademicService {
         if (jsonData is List) {
           return jsonData.map((item) => {
             'semester': item['SemesterId'] ?? 0,
-            'spi': item['SPI'] ?? 0.0,
-            'cpi': item['CPI'] ?? 0.0,
+            'spi': double.tryParse(item['SPI']?.toString() ?? '0') ?? 0.0,
+            'cpi': double.tryParse(item['CPI']?.toString() ?? '0') ?? 0.0,
             'rank': item['Rank'] ?? 0,
           }).toList();
         } else if (jsonData is Map) {
           return [{
             'semester': jsonData['SemesterId'] ?? 0,
-            'spi': jsonData['SPI'] ?? 0.0,
-            'cpi': jsonData['CPI'] ?? 0.0,
+            'spi': double.tryParse(jsonData['SPI']?.toString() ?? '0') ?? 0.0,
+            'cpi': double.tryParse(jsonData['CPI']?.toString() ?? '0') ?? 0.0,
             'rank': jsonData['Rank'] ?? 0,
           }];
         }

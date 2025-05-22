@@ -1442,11 +1442,40 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ],
                 ),
                 const SizedBox(height: 16),
-                _buildInfoRow('Current CGPA', '8.8'),
-                _buildInfoRow('Current Semester', '6th'),
-                _buildInfoRow('Academic Rank', '5th'),
-                _buildInfoRow('Non-Academic Rank', '3rd'),
-                _buildInfoRow('Overall Rank', '4th'),
+                if (_isLoadingSemesterSPI)
+                  const Center(child: CircularProgressIndicator())
+                else if (_semesterSPIData.isEmpty)
+                  const Text('No academic data available')
+                else ...[
+                  _buildInfoRow(
+                    'Current CGPA', 
+                    _semesterSPIData.isNotEmpty 
+                      ? _semesterSPIData.last['cpi'].toStringAsFixed(2)
+                      : 'N/A'
+                  ),
+                  _buildInfoRow(
+                    'Current Semester', 
+                    _semesterSPIData.isNotEmpty 
+                      ? '${_semesterSPIData.last['semester']}th'
+                      : 'N/A'
+                  ),
+                  _buildInfoRow(
+                    'Current SPI', 
+                    _semesterSPIData.isNotEmpty 
+                      ? _semesterSPIData.last['spi'].toStringAsFixed(2)
+                      : 'N/A'
+                  ),
+                  _buildInfoRow(
+                    'Academic Rank', 
+                    _semesterSPIData.isNotEmpty 
+                      ? '${_semesterSPIData.last['rank']}th'
+                      : 'N/A'
+                  ),
+                  _buildInfoRow(
+                    'Overall Points', 
+                    '${_cocurricularPoints + _extracurricularPoints}'
+                  ),
+                ],
               ],
             ),
           ),
@@ -1550,7 +1579,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 color: Colors.grey.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.pie_chart_outline, size: 60, color: Colors.grey[400]),
+              child: Icon(Icons.pie_chart_outline, size: 40, color: Colors.grey[400]),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1567,249 +1596,90 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
     }
     
-    // Group activities by type
-    final coCurricularActivities = _activities.where((activity) => activity['eventType'] == 'co-curricular').toList();
-    final extraCurricularActivities = _activities.where((activity) => activity['eventType'] == 'extra-curricular').toList();
-    
-    // Colors for the pie chart sections with gradient effects
-    final Color cocurricularColor = const Color(0xFF4CAF50); // Green
-    final Color extracurricularColor = const Color(0xFF2196F3); // Blue
-    
     // Calculate percentages
     final totalPoints = _cocurricularPoints + _extracurricularPoints;
     final cocurricularPercentage = (_cocurricularPoints / totalPoints * 100).toStringAsFixed(1);
     final extracurricularPercentage = (_extracurricularPoints / totalPoints * 100).toStringAsFixed(1);
     
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Enhanced pie chart with card wrapper
-          Card(
-            elevation: 4,
-            shadowColor: Colors.black26,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    'Activity Points Distribution',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  // Animated pie chart
-                  TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 1500),
-                    curve: Curves.elasticOut,
-                    builder: (context, value, child) {
-                      return SizedBox(
-                        height: 220,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Animated pie chart
-                            PieChart(
-                              PieChartData(
-                                sectionsSpace: 2,
-                                centerSpaceRadius: 50,
-                                sections: [
-                                  PieChartSectionData(
-                                    color: cocurricularColor,
-                                    value: _cocurricularPoints.toDouble() * value,
-                                    title: '$cocurricularPercentage%',
-                                    radius: 90,
-                                    titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                                    badgeWidget: _cocurricularPoints > _extracurricularPoints ? 
-                                        _buildBadge(Icons.emoji_events, cocurricularColor) : null,
-                                    badgePositionPercentageOffset: 1.1,
-                                  ),
-                                  PieChartSectionData(
-                                    color: extracurricularColor,
-                                    value: _extracurricularPoints.toDouble() * value,
-                                    title: '$extracurricularPercentage%',
-                                    radius: 90,
-                                    titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                                    badgeWidget: _extracurricularPoints > _cocurricularPoints ? 
-                                        _buildBadge(Icons.emoji_events, extracurricularColor) : null,
-                                    badgePositionPercentageOffset: 1.1,
-                                  ),
-                                ],
-                              ),
-                              swapAnimationDuration: const Duration(milliseconds: 750),
-                              swapAnimationCurve: Curves.easeInOutQuint,
-                            ),
-                            
-                            // Center total counter
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).cardColor,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                  )
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${(totalPoints * value).toInt()}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-                                  ),
-                                  const Text(
-                                    'TOTAL',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Enhanced legend cards
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Co-curricular card
-                      _buildLegendCard(
-                        'Co-curricular',
-                        _cocurricularPoints,
-                        cocurricularColor,
-                        Icons.school,
-                        '$cocurricularPercentage%',
+    // Colors for the pie chart sections
+    final Color cocurricularColor = const Color(0xFF4CAF50); // Green
+    final Color extracurricularColor = const Color(0xFF2196F3); // Blue
+    
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 1500),
+        curve: Curves.elasticOut,
+        builder: (context, value, child) {
+          return SizedBox(
+            height: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Animated pie chart
+                PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 35,
+                    sections: [
+                      PieChartSectionData(
+                        color: cocurricularColor,
+                        value: _cocurricularPoints.toDouble() * value,
+                        title: '$cocurricularPercentage%',
+                        radius: 70,
+                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        badgeWidget: _cocurricularPoints > _extracurricularPoints ? 
+                            _buildBadge(Icons.emoji_events, cocurricularColor) : null,
+                        badgePositionPercentageOffset: 1.1,
                       ),
-                      
-                      // Extra-curricular card
-                      _buildLegendCard(
-                        'Extra-curricular',
-                        _extracurricularPoints,
-                        extracurricularColor,
-                        Icons.sports_soccer,
-                        '$extracurricularPercentage%',
+                      PieChartSectionData(
+                        color: extracurricularColor,
+                        value: _extracurricularPoints.toDouble() * value,
+                        title: '$extracurricularPercentage%',
+                        radius: 70,
+                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        badgeWidget: _extracurricularPoints > _cocurricularPoints ? 
+                            _buildBadge(Icons.emoji_events, extracurricularColor) : null,
+                        badgePositionPercentageOffset: 1.1,
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Total points display
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [cocurricularColor.withOpacity(0.8), extracurricularColor.withOpacity(0.8)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                )
+                  swapAnimationDuration: const Duration(milliseconds: 750),
+                  swapAnimationCurve: Curves.easeInOutQuint,
+                ),
+                
+                // Center total counter
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${(totalPoints * value).toInt()}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      const Text(
+                        'TOTAL',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-            child: Text(
-              'Total: ${_cocurricularPoints + _extracurricularPoints} points',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Activity Breakdown
-          Text(
-            'Activities Breakdown',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          
-          // Co-curricular Activities
-          if (coCurricularActivities.isNotEmpty) ...[  
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  'Co-curricular Activities',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: coCurricularActivities.length,
-              itemBuilder: (context, index) {
-                final activity = coCurricularActivities[index];
-                return _buildActivityItem(
-                  activity['eventName'] ?? 'Unknown Activity',
-                  activity['eventDate'] != null ? DateTime.parse(activity['eventDate']).toString().substring(0, 10) : 'Unknown Date',
-                  activity['participationType'] ?? 'Participant',
-                  int.parse(activity['totalCocurricular']?.toString() ?? '0'),
-                  cocurricularColor,
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-          
-          // Extra-curricular Activities
-          if (extraCurricularActivities.isNotEmpty) ...[  
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  'Extra-curricular Activities',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: extraCurricularActivities.length,
-              itemBuilder: (context, index) {
-                final activity = extraCurricularActivities[index];
-                return _buildActivityItem(
-                  activity['eventName'] ?? 'Unknown Activity',
-                  activity['eventDate'] != null ? DateTime.parse(activity['eventDate']).toString().substring(0, 10) : 'Unknown Date',
-                  activity['participationType'] ?? 'Participant',
-                  int.parse(activity['totalExtracurricular']?.toString() ?? '0'),
-                  extracurricularColor,
-                );
-              },
-            ),
-          ],
-          
-          // If no activities are available
-          if (_activities.isEmpty) 
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0),
-              child: Text(
-                'No detailed activity data available',
-                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-              ),
-            ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -2096,7 +1966,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       animation: _graphAnimationController,
       builder: (context, child) {
         return SizedBox(
-          height: 150, // Decreased from 200 to make it even smaller
+          height: 120, // Decreased from 150 to make it smaller
           child: CustomPaint(
             painter: RadarChartPainter(
               subjects: ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'],
@@ -2115,7 +1985,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               colors: [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.teal],
               context: context,
             ),
-            size: const Size(double.infinity, 150), // Decreased from 200 to make it even smaller
+            size: const Size(double.infinity, 120), // Decreased from 150 to match the SizedBox height
           ),
         );
       },
@@ -2381,7 +2251,7 @@ class RadarChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.35; // Decreased from 0.4
+    final radius = size.width * 0.25; // Decreased from 0.35 to make the chart smaller
     
     // Draw background
     canvas.drawCircle(center, radius, _backgroundPaint);

@@ -509,7 +509,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         ),
         Text(
-          '92200133002',
+          _currentUser?.enrollmentNumber ?? 'N/A',
           style: TextStyle(
             fontSize: 16,
             color: isDark ? Colors.white70 : Colors.black54,

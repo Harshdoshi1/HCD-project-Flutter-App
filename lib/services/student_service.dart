@@ -6,24 +6,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import '../utils/api_config.dart';
 
 class StudentService {
-  // Base URL that works for different environments
+  // Use ApiConfig for consistent URL configuration
   static String get baseUrl {
-    // For web or desktop - use localhost
-    if (kIsWeb || Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      return 'http://localhost:5001/api';
-    }
-    // For Android emulator - use 10.0.2.2 (special IP that routes to host machine)
-    else if (Platform.isAndroid) {
-      return 'http://10.0.2.2:5001/api'; 
-    }
-    // For iOS simulator - use localhost
-    else if (Platform.isIOS) {
-      return 'http://localhost:5001/api';
-    }
-    // Default fallback
-    return 'http://localhost:5001/api';
+    return ApiConfig.baseUrl;
   }
 
   // Get current logged-in student profile
@@ -202,8 +190,8 @@ class StudentService {
       // Print debug info
       print('Making API request to get component marks for email: $email');
       
-      // Ensure baseUrl is correct - for local dev, use specific IP
-      final apiUrl = 'http://localhost:5001/api/studentCPI/getStudentComponentMarksAndSubjectsByEmail';
+      // Use dynamic baseUrl from ApiConfig
+      final apiUrl = '$baseUrl/studentCPI/getStudentComponentMarksAndSubjectsByEmail';
       print('API URL: $apiUrl');
       
       final requestBody = jsonEncode({'email': email});
@@ -288,7 +276,7 @@ class StudentService {
         // Use the fetchEventsbyEnrollandSemester endpoint
         try {
           final response = await http.post(
-            Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+            Uri.parse('$baseUrl/events/fetchEventsbyEnrollandSemester'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
@@ -364,7 +352,7 @@ class StudentService {
       
       // Use the fetchEventsbyEnrollandSemester endpoint with 'all' for semester
       final response = await http.post(
-        Uri.parse('http://localhost:5001/api/events/fetchEventsbyEnrollandSemester'),
+        Uri.parse('$baseUrl/events/fetchEventsbyEnrollandSemester'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
