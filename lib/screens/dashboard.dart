@@ -557,696 +557,143 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    
+    final theme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.user;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-      body: Stack(
-        children: [
-          // Gradient background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  const Color(0xFF03A9F4),
-                  Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-                ],
-                stops: [0.0, 0.3],
-              ),
-            ),
-          ),
-          // Content
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Welcome message and profile icon
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome back,',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            _userName,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: MediaQuery.of(context).size.width * 0.6,
-                            child: Text(
-                              '"${_dailyQuote}"',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
-                                fontStyle: FontStyle.italic,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => ProfileScreen(
-                                  toggleTheme: widget.toggleTheme,
-                                ),
-                              ),
-                            );
-                          });
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: FutureBuilder<SharedPreferences>(
-                            future: SharedPreferences.getInstance(),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null) {
-                                final prefs = snapshot.data!;
-                                final userEmail = prefs.getString('userEmail') ?? '';
-                                final imagePath = prefs.getString('${userEmail}_profileImage');
-                                
-                                if (imagePath != null && imagePath.isNotEmpty) {
-                                  final file = File(imagePath);
-                                  return CircleAvatar(
-                                    radius: 24,
-                                    backgroundImage: FileImage(file),
-                                  );
-                                }
-                              }
-                              
-                              return CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
-                                child: Icon(
-                                  Icons.person,
-                                  color: Theme.of(context).textTheme.bodyLarge!.color,
-                                  size: 32,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Charts section
-                  _buildChartsSection(),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        backgroundColor: isDark ? Colors.black : theme.primary,
+        foregroundColor: isDark ? Colors.white : theme.onPrimary,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(toggleTheme: widget.toggleTheme),
+                ),
+              );
+            },
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildChartsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Charts',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Graph selection row
-        SlideTransition(
-          position: _slideAnimation,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: _buildIconRow(),
-          ),
-        ),
-        const SizedBox(height: 24),
-        // Main chart
-        SlideTransition(
-          position: _slideAnimation,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: _buildGlassChartCard(
-              title: _getChartTitle(),
-              height: 300,
-              chart: _getActiveChart(),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        // Info card
-        SlideTransition(
-          position: _slideAnimation,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: _buildGlassInfoCard(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIconRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildIconButton('Subjects', Icons.radar, _activeGraph == 'subjects', () => _switchGraph('subjects')),
-        _buildIconButton('Activities', Icons.pie_chart, _activeGraph == 'activities', () => _switchGraph('activities')),
-        _buildIconButton('Semesters', Icons.insert_chart, _activeGraph == 'semesters', () => _switchGraph('semesters')),
-      ],
-    );
-  }
-
-  Widget _buildIconButton(String label, IconData icon, bool isActive, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive 
-              ? Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.15) 
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive 
-                ? Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.5) 
-                : Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-            width: 1,
-          ),
-        ),
+      body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              color: isActive ? Theme.of(context).textTheme.bodyLarge!.color : Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-              size: 24,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Theme.of(context).textTheme.bodyLarge!.color : Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            // Overview Card
+            _buildOverviewCard(theme, isDark),
+            
+            // Clubs Section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Clubs',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...clubs.map((club) => ClubCard(
+                    club: club,
+                    onTap: () {
+                      // Handle club card tap
+                      print('Club card tapped: ${club['name']}');
+                    },
+                  )).toList(),
+                ],
               ),
             ),
+
+            // Rest of the dashboard content
+            // ... existing code ...
           ],
         ),
       ),
     );
   }
 
-  Widget _buildGlassChartCard({required String title, required double height, required Widget chart}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-              width: 1,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildOverviewCard(ColorScheme theme, bool isDark) {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF03A9F4),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _getIconForTitle(title),
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.dashboard,
+                    color: theme.primary,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Expanded(child: chart),
+                const SizedBox(width: 12),
+                Text(
+                  'Overview',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDomainExpertiseChart() {
-    // Domain expertise data
-    final List<Map<String, dynamic>> expertiseData = [
-      {'domain': 'Mobile', 'value': 30, 'color': Colors.blue},
-      {'domain': 'ML', 'value': 25, 'color': Colors.purple},
-      {'domain': 'Web', 'value': 20, 'color': Colors.amber},
-      {'domain': 'Cloud', 'value': 15, 'color': Colors.green},
-      {'domain': 'Other', 'value': 10, 'color': Colors.red},
-    ];
-    
-    // Track touched section for hover effect
-    int? touchedIndex;
-    
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: _graphAnimationController,
-        curve: Curves.easeIn,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        height: 240, // Reduced height to fit better in card
-        child: TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 1200),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) {
-            return PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 30,
-                startDegreeOffset: 270, // Start from top
-                pieTouchData: PieTouchData(
-                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    setState(() {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        touchedIndex = -1;
-                        return;
-                      }
-                      touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                    });
-                  },
-                  enabled: true,
-                ),
-                sections: List.generate(expertiseData.length, (index) {
-                  final data = expertiseData[index];
-                  final isTouched = index == touchedIndex;
-                  final fontSize = isTouched ? 18.0 : 14.0;
-                  final radius = isTouched ? 90.0 : 80.0;
-                  
-                  return PieChartSectionData(
-                    color: data['color'],
-                    value: data['value'].toDouble() * value, // Animate value
-                    title: isTouched ? '${data['value']}%' : '',
-                    radius: radius,
-                    titleStyle: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [Shadow(color: Colors.black, blurRadius: 2)],
-                    ),
-                    badgeWidget: Text(
-                      data['domain'],
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    badgePositionPercentageOffset: .8,
-                  );
-                }),
+            const SizedBox(height: 16),
+            if (_isLoadingSemesterSPI)
+              const Center(child: CircularProgressIndicator())
+            else if (_semesterSPIData.isEmpty)
+              const Text('No academic data available')
+            else ...[
+              _buildInfoRow(
+                'Current CGPA', 
+                _semesterSPIData.isNotEmpty 
+                  ? _semesterSPIData.last['cpi'].toStringAsFixed(2)
+                  : 'N/A'
               ),
-              swapAnimationDuration: const Duration(milliseconds: 750),
-              swapAnimationCurve: Curves.easeInOutQuint,
-            );
-          }
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgrammingLanguagesChart() {
-    final languages = ['Dart', 'Python', 'JS', 'Java', 'C++', 'C#', 'C'];
-    final values = [95.0, 88.0, 80.0, 75.0, 70.0, 65.0, 60.0];
-    final colors = [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.red,
-      Colors.teal,
-      Colors.amber,
-    ];
-    
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: _graphAnimationController,
-        curve: Curves.easeIn,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        height: 240,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 1200),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) {
-            return BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: 100,
-                minY: 0,
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: Colors.black.withOpacity(0.8),
-                    tooltipPadding: const EdgeInsets.all(8),
-                    tooltipMargin: 8,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      return BarTooltipItem(
-                        '${languages[groupIndex]}: ${values[groupIndex].toInt()}%',
-                        const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        if (value >= 0 && value < languages.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              languages[value.toInt()],
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox();
-                      },
-                      reservedSize: 30,
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        String text = '';
-                        if (value == 0) {
-                          text = '0';
-                        } else if (value == 5) {
-                          text = '5';
-                        } else if (value == 10) {
-                          text = '10';
-                        } else {
-                          return const SizedBox();
-                        }
-                        return Text(
-                          text,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                          ),
-                        );
-                      },
-                      reservedSize: 30,
-                    ),
-                  ),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                gridData: FlGridData(
-                  show: true,
-                  horizontalInterval: 20,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: Colors.white.withOpacity(0.1),
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
-                barGroups: List.generate(languages.length, (index) {
-                  return BarChartGroupData(
-                    x: index,
-                    barRods: [
-                      BarChartRodData(
-                        toY: values[index] * value,
-                        color: colors[index],
-                        width: 16,
-                        borderRadius: BorderRadius.circular(4),
-                        backDrawRodData: BackgroundBarChartRodData(
-                          show: true,
-                          toY: 100,
-                          color: Colors.white.withOpacity(0.1),
-                        ),
-                      ),
-                    ],
-                  );
-                }),
+              _buildInfoRow(
+                'Current Semester', 
+                _semesterSPIData.isNotEmpty 
+                  ? '${_semesterSPIData.last['semester']}th'
+                  : 'N/A'
               ),
-              swapAnimationDuration: const Duration(milliseconds: 750),
-              swapAnimationCurve: Curves.easeInOutQuint,
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventsList(List<Map<String, dynamic>> events) {
-    return ListView.builder(
-      itemCount: events.length,
-      padding: const EdgeInsets.symmetric(horizontal: 10), // Added horizontal padding
-      itemBuilder: (context, index) {
-        final event = events[index];
-        return GestureDetector(
-          onTap: () {
-            _showEventDetails(context, event);
-          },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-                    width: 1,
-                  ),
-                ),
-                child: ListTile(
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Added padding
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: (event['color'] as Color).withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      event['icon'],
-                      color: (event['color'] as Color),
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    event['title'],
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  subtitle: Text(
-                    event['date'],
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.7) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-                      fontSize: 12,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.arrow_forward_ios,
-                    color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                    size: 14,
-                  ),
-                ),
+              _buildInfoRow(
+                'Current SPI', 
+                _semesterSPIData.isNotEmpty 
+                  ? _semesterSPIData.last['spi'].toStringAsFixed(2)
+                  : 'N/A'
               ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showEventDetails(BuildContext context, Map<String, dynamic> event) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isAcademic = academicEvents.contains(event);
-    
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2),
-                  width: 1,
-                ),
+              _buildInfoRow(
+                'Academic Rank', 
+                _semesterSPIData.isNotEmpty 
+                  ? '${_semesterSPIData.last['rank']}th'
+                  : 'N/A'
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: (event['color'] as Color).withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          event['icon'],
-                          color: event['color'] as Color,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              event['title'],
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            Text(
-                              event['date'],
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: isDark ? Colors.white70 : Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isAcademic ? 'Marks' : 'Points',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          isAcademic ? '50 marks' : '100 points',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF03A9F4),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    child: const Text('Close'),
-                  ),
-                ],
+              _buildInfoRow(
+                'Overall Points', 
+                '${_cocurricularPoints + _extracurricularPoints}'
               ),
-            ),
-          ),
+            ],
+          ],
         ),
       ),
     );
@@ -2721,4 +2168,129 @@ class RadarChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class ClubCard extends StatelessWidget {
+  final Map<String, dynamic> club;
+  final Function()? onTap;
+
+  const ClubCard({
+    Key? key,
+    required this.club,
+    this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        elevation: 4,
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              // Club Icon with colored background
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: club['color'] ?? Colors.blue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  club['icon'] ?? Icons.group,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Club Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      club['name'] ?? 'Club Name',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      club['description'] ?? 'No description available',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: club['color']?.withOpacity(0.2) ?? Colors.blue.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            club['role'] ?? 'Member',
+                            style: TextStyle(
+                              color: club['color'] ?? Colors.blue,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            club['code'] ?? '',
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Join Status
+              if (club['joined'] == true)
+                const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: club['color'] ?? Colors.blue,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Join',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
