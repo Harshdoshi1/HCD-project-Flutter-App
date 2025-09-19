@@ -129,15 +129,30 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           _isLoading = false;
         });
 
-        // Navigate to main screen
+        // Show success dialog
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MainNavigation(
-              initialTabIndex: 0,
-              toggleTheme: widget.toggleTheme ?? () {},
-            ),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Login Successful'),
+            content: const Text('Welcome back!'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close the dialog
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MainNavigation(
+                        initialTabIndex: 0,
+                        toggleTheme: widget.toggleTheme ?? () {},
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
       } catch (e) {
@@ -145,11 +160,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           _isLoading = false;
         });
 
+        // Show error dialog
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Login Failed'),
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
       }

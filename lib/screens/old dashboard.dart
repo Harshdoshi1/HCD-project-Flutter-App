@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/api_config.dart';
-import 'package:http/http.dart' as http;
-import 'dart:math' as math;
 import 'dart:ui';
+import 'dart:math' as math;
 import 'dart:io';
-import 'dart:convert';
-import '../providers/user_provider.dart';
-import '../services/academic_service.dart';
-import '../services/student_service.dart';
 import 'profile_screen.dart';
 import '../constants/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -25,33 +18,10 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
-  // Activity points for the logged-in user
-  int _cocurricularPoints = 0;
-  int _extracurricularPoints = 0;
-  bool _isLoadingActivityPoints = true;
-  List<dynamic> _activities = [];
-  String? _enrollmentNumber;  
-  final AcademicService _academicService = AcademicService();
-  List<SemesterSPI>? _spiData;
-  List<Map<String, dynamic>> _semesterSPIData = [];
-  bool _isLoadingSemesterSPI = true;
-  bool _isLoadingSPI = true;
   String _activeGraph = 'sgpa';
   late AnimationController _graphAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
-  // Subject data for radar chart
-  bool _isLoadingSubjectData = true;
-  List<String> _currentSemesterSubjects = [];
-  List<double> _currentSemesterScores = [];
-  List<Color> _subjectColors = [];
-  int _currentSemesterNumber = 0;
-  final Map<String, double> _gradeToScore = {
-    'AA': 100.0, 'AB': 90.0, 'BB': 80.0, 
-    'BC': 70.0, 'CC': 60.0, 'CD': 50.0, 
-    'DD': 40.0, 'FF': 0.0, 'NA': 0.0
-  };
 
   void _switchGraph(String newGraph) {
     if (_activeGraph != newGraph) {
@@ -195,192 +165,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late String _dailyQuote;
   String _userName = 'User';
 
-  Future<void> _loadSPIData() async {
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final user = userProvider.user;
-      if (user != null) {
-        debugPrint('Fetching SPI data for: ${user.email}');
-        final spiData = await _academicService.getStudentSPI(user.email);
-        // Even if spiData is empty, we don't throw an exception
-        if (!mounted) return;
-        setState(() {
-          _spiData = spiData; // This will be an empty list if no data was found
-          _isLoadingSPI = false;
-          debugPrint('SPI data loaded successfully: ${spiData.length} items');
-        });
-        
-        // Also load semester SPI data for bar chart
-        _loadSemesterSPIData(user.enrollmentNumber);
-      } else {
-        debugPrint('User is null, cannot load SPI data');
-        if (!mounted) return;
-        setState(() {
-          _spiData = [];
-          _isLoadingSPI = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading SPI data: $e');
-      if (!mounted) return;
-      setState(() {
-        _spiData = []; // Set to empty list on error
-        _isLoadingSPI = false;
-      });
-    }
-  }
-  
-  Future<void> _loadSemesterSPIData(String enrollmentNumber) async {
-    try {
-      debugPrint('Fetching semester SPI data for enrollment: $enrollmentNumber');
-      final data = await _academicService.getSemesterSPIByEnrollment(enrollmentNumber);
-      
-      if (!mounted) return;
-      
-      setState(() {
-        _semesterSPIData = data;
-        _isLoadingSemesterSPI = false;
-        debugPrint('Semester SPI data loaded: ${data.length} semesters');
-      });
-    } catch (e) {
-      debugPrint('Error loading semester SPI data: $e');
-      if (!mounted) return;
-      setState(() {
-        _semesterSPIData = [];
-        _isLoadingSemesterSPI = false;
-      });
-    }
-  }
-
-  Future<void> _loadSubjectData(String email) async {
-    print('Starting _loadSubjectData for email: $email');
-    setState(() {
-      _isLoadingSubjectData = true;
-    });
-    
-    try {
-      // Clear previous data
-      _currentSemesterSubjects.clear();
-      _currentSemesterScores.clear();
-      _subjectColors.clear();
-      
-      // Define fallback color list
-      final List<Color> baseColors = [
-        Colors.blue,
-        Colors.red,
-        Colors.green,
-        Colors.orange,
-        Colors.purple,
-        Colors.teal,
-        Colors.amber,
-        Colors.pink,
-        Colors.indigo,
-        Colors.cyan,
-      ];
-
-      // Use the API to get actual subject data
-      print('Fetching subject data from API for email: $email');
-      final studentService = StudentService();
-      final response = await studentService.getStudentComponentMarksAndSubjects(email);
-      
-      if (response != null && response.containsKey('semesters') && response['semesters'] is List) {
-        final List<dynamic> semesters = response['semesters'];
-        
-        if (semesters.isNotEmpty) {
-          print('API returned ${semesters.length} semesters');
-          
-          // Find current semester (highest semester number)
-          int highestSemester = 0;
-          Map<String, dynamic>? currentSemesterData;
-          
-          for (var semesterData in semesters) {
-            if (semesterData.containsKey('semesterNumber')) {
-              final int semesterNumber = int.tryParse(semesterData['semesterNumber'].toString()) ?? 0;
-              if (semesterNumber > highestSemester) {
-                highestSemester = semesterNumber;
-                currentSemesterData = semesterData;
-              }
-            }
-          }
-          
-          // Set current semester number
-          _currentSemesterNumber = highestSemester;
-          
-          // Process subject data for the current semester
-          if (currentSemesterData != null && 
-              currentSemesterData.containsKey('subjects') && 
-              currentSemesterData['subjects'] is List) {
-            
-            final List<dynamic> subjects = currentSemesterData['subjects'];
-            print('Found ${subjects.length} subjects for semester $_currentSemesterNumber');
-            
-            // Process each subject
-            for (int i = 0; i < subjects.length; i++) {
-              var subject = subjects[i];
-              if (subject is Map<String, dynamic>) {
-                String subjectName = subject['subjectName'] ?? subject['name'] ?? 'Unknown';
-                String grade = subject['grade'] ?? 'NA';
-                
-                // Skip subjects with no grade
-                if (grade == 'NA' || grade.isEmpty) continue;
-                
-                // Convert grade to score
-                double score = _gradeToScore[grade] ?? 0.0;
-                
-                // Add subject to lists
-                _currentSemesterSubjects.add(subjectName);
-                _currentSemesterScores.add(score);
-                
-                // Add color for the subject (cycling through baseColors)
-                _subjectColors.add(baseColors[i % baseColors.length]);
-                
-                print('Added subject: $subjectName with grade: $grade, score: $score');
-              }
-            }
-          }
-        }
-      }
-      
-      // If no data was found from API, we don't use any fallback hardcoded data
-      if (_currentSemesterSubjects.isEmpty) {
-        print('No data from API, no fallback data will be used');
-        // Keep the lists empty to show the "No subject data available" message
-      }
-    } catch (e) {
-      print('Error in _loadSubjectData: $e');
-      // Keep lists empty on error to show "No Data" message
-      _currentSemesterSubjects = [];
-      _currentSemesterScores = [];
-      _subjectColors = [];
-      _currentSemesterNumber = 0;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingSubjectData = false;
-        });
-      }
-    }
-  }
-
   Future<void> _loadUserData() async {
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final user = userProvider.user;
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail') ?? '';
       
-      if (user != null) {
-        setState(() {
-          _userName = user.name;
-          _enrollmentNumber = user.enrollmentNumber;
-        });
-        
-        // Now that we have the enrollment number, fetch additional data
-        if (_enrollmentNumber != null) {
-          await _loadSemesterSPIData(_enrollmentNumber!);
-          
-          // Load subject data for radar chart
-          if (user.email != null) {
-            await _loadSubjectData(user.email!);
-          }
+      if (userEmail.isNotEmpty) {
+        // Extract name from email - only take alphabetic characters before @
+        final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(userEmail.split('@').first);
+        if (nameMatch != null && nameMatch.group(0) != null) {
+          setState(() {
+            _userName = nameMatch.group(0)!;
+            // Capitalize first letter
+            _userName = _userName[0].toUpperCase() + _userName.substring(1);
+          });
         }
       }
     } catch (e) {
@@ -388,165 +186,32 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  Future<void> _loadActivityPoints() async {
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final user = userProvider.user;
-      
-      if (user != null) {
-        setState(() {
-          _enrollmentNumber = user.enrollmentNumber;
-        });
-        
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('token');
-        
-        if (token != null && _enrollmentNumber != null) {
-          // First, fetch the total activity points from the new endpoint
-          try {
-            final pointsResponse = await http.post(
-              Uri.parse(ApiConfig.getUrl('events/fetchTotalActivityPoints')),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-              body: json.encode({
-                'enrollmentNumber': _enrollmentNumber,
-              }),
-            );
-            
-            if (pointsResponse.statusCode == 200) {
-              final pointsData = json.decode(pointsResponse.body);
-              
-              print('Total activity points response: $pointsData');
-              
-              setState(() {
-                _cocurricularPoints = pointsData['totalCocurricular'] != null ? 
-                    int.parse(pointsData['totalCocurricular'].toString()) : 0;
-                _extracurricularPoints = pointsData['totalExtracurricular'] != null ? 
-                    int.parse(pointsData['totalExtracurricular'].toString()) : 0;
-              });
-            }
-          } catch (e) {
-            print('Error fetching total activity points: $e');
-            // If we can't get points from the new endpoint, fallback to user data
-            final userData = prefs.getString('userData');
-            if (userData != null) {
-              final userMap = json.decode(userData);
-              setState(() {
-                _cocurricularPoints = userMap['totalCocurricular'] ?? userMap['cocurricularPoints'] ?? 0;
-                _extracurricularPoints = userMap['totalExtracurricular'] ?? userMap['extracurricularPoints'] ?? 0;
-              });
-            }
-          }
-          
-          // Then, fetch detailed activities data
-          try {
-            final response = await http.post(
-              Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-              body: json.encode({
-                'enrollmentNumber': _enrollmentNumber,
-                'semester': 'all'
-              }),
-            );
-            
-            if (response.statusCode == 200) {
-              final data = json.decode(response.body);
-              
-              if (data is List && data.isNotEmpty) {
-                setState(() {
-                  _activities = data;
-                  _isLoadingActivityPoints = false;
-                });
-              } else if (data is Map) {
-                // Handle case when API returns a map instead of a list
-                setState(() {
-                  _isLoadingActivityPoints = false;
-                });
-              }
-            } else {
-              setState(() {
-                _isLoadingActivityPoints = false;
-              });
-            }
-          } catch (e) {
-            print('Error fetching activities: $e');
-            setState(() {
-              _isLoadingActivityPoints = false;
-            });
-          }
-        } else {
-          setState(() {
-            _isLoadingActivityPoints = false;
-          });
-        }
-      } else {
-        setState(() {
-          _cocurricularPoints = 0;
-          _extracurricularPoints = 0;
-          _isLoadingActivityPoints = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading activity points: $e');
-      setState(() {
-        _isLoadingActivityPoints = false;
-      });
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-
-    // Initialize animation controller
     _graphAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 400),
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(
+    _fadeAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(
-        parent: _graphAnimationController,
-        curve: Curves.easeInOut,
+        parent: _graphAnimationController, 
+        curve: Curves.easeIn
       ),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.5, 0),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _graphAnimationController,
-        curve: Curves.easeOutCubic,
-      ),
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _graphAnimationController, curve: Curves.easeOut),
     );
-    
-    // Define subject colors
-    _subjectColors = [
-      Colors.blue, Colors.green, Colors.purple, 
-      Colors.orange, Colors.red, Colors.teal,
-      Colors.pink, Colors.amber, Colors.indigo,
-      Colors.cyan, Colors.deepOrange, Colors.lightGreen,
-    ];
-    
-    // Start animation
+
     _graphAnimationController.forward();
-    
-    // Load user data, SPI data, and activity points
-    _loadUserData();
-    _loadSPIData();
-    _loadActivityPoints();
     
     // Set random daily quote
     _dailyQuote = _dailyQuotes[DateTime.now().day % _dailyQuotes.length];
+    
+    // Load user data from shared preferences
+    _loadUserData();
   }
 
   @override
@@ -632,6 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               MaterialPageRoute(
                                 builder: (context) => ProfileScreen(
                                   toggleTheme: widget.toggleTheme,
+                                  isDarkMode: Theme.of(context).brightness == Brightness.dark,
                                 ),
                               ),
                             );
@@ -683,6 +349,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   const SizedBox(height: 24),
                   // Charts section
                   _buildChartsSection(),
+                  const SizedBox(height: 24),
+                  // Events section
+                  _buildEventsSection(),
+                  const SizedBox(height: 24),
+                  // Clubs section
+                  _buildClubsSection(),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -714,7 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: _buildIconRow(),
           ),
         ),
-                  const SizedBox(height: 24),
+        const SizedBox(height: 24),
         // Main chart
         SlideTransition(
           position: _slideAnimation,
@@ -744,9 +416,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
+        _buildIconButton('SGPA', Icons.bar_chart, _activeGraph == 'sgpa', () => _switchGraph('sgpa')),
+        _buildIconButton('Expertise', Icons.pie_chart, _activeGraph == 'expertise', () => _switchGraph('expertise')),
         _buildIconButton('Subjects', Icons.radar, _activeGraph == 'subjects', () => _switchGraph('subjects')),
-        _buildIconButton('Activities', Icons.pie_chart, _activeGraph == 'activities', () => _switchGraph('activities')),
-        _buildIconButton('Semesters', Icons.insert_chart, _activeGraph == 'semesters', () => _switchGraph('semesters')),
+        _buildIconButton('Languages', Icons.code, _activeGraph == 'languages', () => _switchGraph('languages')),
       ],
     );
   }
@@ -836,7 +509,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ],
                 ),
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Expanded(child: chart),
               ],
             ),
@@ -1053,9 +726,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           show: true,
                           toY: 100,
                           color: Colors.white.withOpacity(0.1),
-            ),
-          ),
-        ],
+                        ),
+                      ),
+                    ],
                   );
                 }),
               ),
@@ -1596,40 +1269,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ],
                 ),
                 const SizedBox(height: 16),
-                if (_isLoadingSemesterSPI)
-                  const Center(child: CircularProgressIndicator())
-                else if (_semesterSPIData.isEmpty)
-                  const Text('No academic data available')
-                else ...[
-                  _buildInfoRow(
-                    'Current CGPA', 
-                    _semesterSPIData.isNotEmpty 
-                      ? _semesterSPIData.last['cpi'].toStringAsFixed(2)
-                      : 'N/A'
-                  ),
-                  _buildInfoRow(
-                    'Current Semester', 
-                    _semesterSPIData.isNotEmpty 
-                      ? '${_semesterSPIData.last['semester']}th'
-                      : 'N/A'
-                  ),
-                  _buildInfoRow(
-                    'Current SPI', 
-                    _semesterSPIData.isNotEmpty 
-                      ? _semesterSPIData.last['spi'].toStringAsFixed(2)
-                      : 'N/A'
-                  ),
-                  _buildInfoRow(
-                    'Academic Rank', 
-                    _semesterSPIData.isNotEmpty 
-                      ? '${_semesterSPIData.last['rank']}th'
-                      : 'N/A'
-                  ),
-                  _buildInfoRow(
-                    'Overall Points', 
-                    '${_cocurricularPoints + _extracurricularPoints}'
-                  ),
-                ],
+                _buildInfoRow('Current CGPA', '8.8'),
+                _buildInfoRow('Current Semester', '6th'),
+                _buildInfoRow('Academic Rank', '5th'),
+                _buildInfoRow('Non-Academic Rank', '3rd'),
+                _buildInfoRow('Overall Rank', '4th'),
               ],
             ),
           ),
@@ -1671,10 +1315,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   IconData _getIconForTitle(String title) {
     switch (title) {
+      case 'SGPA Progression':
+        return Icons.bar_chart;
+      case 'Domain Expertise':
+        return Icons.pie_chart;
       case 'Current Semester Subjects':
         return Icons.radar;
-      case 'Activity Points':
-        return Icons.pie_chart;
+      case 'Programming Languages':
+        return Icons.code;
       default:
         return Icons.analytics;
     }
@@ -1682,696 +1330,65 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   String _getChartTitle() {
     switch (_activeGraph) {
+      case 'sgpa':
+        return 'SGPA Progression';
+      case 'expertise':
+        return 'Domain Expertise';
       case 'subjects':
-        return 'Subject Performance';
-      case 'activities':
-        return 'Activity Points';
-      case 'semesters':
-        return 'All Semester SPIs';
+        return 'Current Semester Subjects';
+      case 'languages':
+        return 'Programming Languages';
       default:
-        return 'Performance Overview';
+        return 'Chart';
     }
   }
 
   Widget _getActiveChart() {
     switch (_activeGraph) {
+      case 'sgpa':
+        return _buildAnimatedBarChart();
+      case 'expertise':
+        return _buildDomainExpertiseChart();
       case 'subjects':
-        return _buildAnimatedRadarChart(); 
-      case 'activities':
-        return _buildActivityPointsChart();
-      case 'semesters':
-        return _buildSemesterSPIChart();
+        return _buildAnimatedRadarChart();
+      case 'languages':
+        return _buildProgrammingLanguagesChart();
       default:
-        return _buildAnimatedRadarChart(); // Default to subjects chart
+        return Container();
     }
-  }
-  
-  // Helper method to build a legend item for the activity points chart
-  Widget _buildLegendItem({
-    required Color color,
-    required String title,
-    required int points,
-    required String percentage,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Color indicator
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 4),
-        // Text info
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).textTheme.bodyMedium?.color,
-              ),
-            ),
-            Text(
-              '$points pts ($percentage%)',
-              style: TextStyle(
-                fontSize: 9,
-                color: Theme.of(context).textTheme.bodySmall?.color,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildActivityPointsChart() {
-    if (_isLoadingActivityPoints) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(height: 40),
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading activity data...'),
-          ],
-        ),
-      );
-    }
-    
-    // If both points are 0, show a message
-    if (_cocurricularPoints == 0 && _extracurricularPoints == 0) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.pie_chart_outline, size: 40, color: Colors.grey[400]),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No activity points available',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Participate in activities to earn points',
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    // Calculate percentages
-    final totalPoints = _cocurricularPoints + _extracurricularPoints;
-    final cocurricularPercentage = (_cocurricularPoints / totalPoints * 100).toStringAsFixed(1);
-    final extracurricularPercentage = (_extracurricularPoints / totalPoints * 100).toStringAsFixed(1);
-    
-    // Colors for the pie chart sections
-    final Color cocurricularColor = const Color(0xFF4CAF50); // Green
-    final Color extracurricularColor = const Color(0xFF2196F3); // Blue
-    
-    return Container(
-      width: double.infinity,
-      height: 230, // Adjusted overall height to fix overflow
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Chart title
-          Text(
-            'Activity Points Distribution',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Theme.of(context).textTheme.titleMedium?.color,
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Animated pie chart
-          SizedBox(
-            height: 120,
-            child: Center(
-              child: SizedBox(
-                width: 200, // Limited width for pie chart
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0.0, end: 1.0),
-                  duration: const Duration(milliseconds: 1500),
-                  curve: Curves.elasticOut,
-                  builder: (context, value, child) {
-                    return Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Animated pie chart
-                        PieChart(
-                          PieChartData(
-                            sectionsSpace: 2,
-                            centerSpaceRadius: 25, // Even smaller center space
-                            sections: [
-                              PieChartSectionData(
-                                color: cocurricularColor,
-                                value: _cocurricularPoints.toDouble() * value,
-                                title: '',  // Remove percentage from slice
-                                radius: 45, // Reduced radius to match smaller width
-                                titleStyle: const TextStyle(fontSize: 0), // Hide title in pie
-                                badgeWidget: null, // Removed trophy badge
-                              ),
-                              PieChartSectionData(
-                                color: extracurricularColor,
-                                value: _extracurricularPoints.toDouble() * value,
-                                title: '', // Remove percentage from slice
-                                radius: 45, // Reduced radius to match smaller width
-                                titleStyle: const TextStyle(fontSize: 0), // Hide title in pie
-                                badgeWidget: null, // Removed trophy badge
-                              ),
-                            ],
-                          ),
-                          swapAnimationDuration: const Duration(milliseconds: 750),
-                          swapAnimationCurve: Curves.easeInOutQuint,
-                        ),
-                        
-                        // Center total counter
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                spreadRadius: 1,
-                              )
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${(totalPoints * value).toInt()}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              const Text(
-                                'TOTAL',
-                                style: TextStyle(fontSize: 10, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          // Legend - more compact horizontal layout
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Cocurricular legend item
-                _buildLegendItem(
-                  color: cocurricularColor,
-                  title: 'Cocurricular',
-                  points: _cocurricularPoints,
-                  percentage: cocurricularPercentage,
-                ),
-                // Extracurricular legend item
-                _buildLegendItem(
-                  color: extracurricularColor,
-                  title: 'Extracurricular',
-                  points: _extracurricularPoints,
-                  percentage: extracurricularPercentage,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Badge widget for the pie chart
-  Widget _buildBadge(IconData icon, Color color) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.bounceInOut,
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: color, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 8,
-            spreadRadius: 2,
-          )
-        ],
-      ),
-      padding: const EdgeInsets.all(2),
-      child: Icon(icon, color: color, size: 16),
-    );
-  }
-  
-  // Legend card for pie chart
-  Widget _buildLegendCard(String title, int points, Color color, IconData icon, String percentage) {
-    return Container(
-      width: 140,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5), width: 1),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 14),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '$points pts',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  percentage,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildActivityItem(String name, String date, String type, int points, Color color) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.star,
-                color: color,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Date: $date',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  Text(
-                    'Type: $type',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: color.withOpacity(0.5)),
-              ),
-              child: Text(
-                '$points pts',
-                style: TextStyle(fontWeight: FontWeight.bold, color: color),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Build semester SPI bar chart
-  Widget _buildSemesterSPIChart() {
-    if (_isLoadingSemesterSPI) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_semesterSPIData.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.bar_chart_outlined, size: 60, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No semester data available',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    // Sort data by semester
-    _semesterSPIData.sort((a, b) => (a['semester'] as int).compareTo(b['semester'] as int));
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.center,
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
-              tooltipPadding: const EdgeInsets.all(8),
-              tooltipMargin: 8,
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final semester = _semesterSPIData[groupIndex]['semester'];
-                final spi = _semesterSPIData[groupIndex]['spi'];
-                final cpi = _semesterSPIData[groupIndex]['cpi'];
-                return BarTooltipItem(
-                  'Semester $semester\n',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  children: [
-                    TextSpan(text: 'SPI: ${spi.toStringAsFixed(2)}\n', style: const TextStyle(color: Colors.yellow)),
-                    TextSpan(text: 'CPI: ${cpi.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent)),
-                  ],
-                );
-              },
-            ),
-          ),
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= 0 && value.toInt() < _semesterSPIData.length) {
-                    return SideTitleWidget(
-                      axisSide: meta.axisSide,
-                      child: Text(
-                        'S${_semesterSPIData[value.toInt()]['semester']}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    );
-                  }
-                  return const SizedBox();
-                },
-                reservedSize: 28,
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                getTitlesWidget: (value, meta) {
-                  return SideTitleWidget(
-                    axisSide: meta.axisSide,
-                    child: Text(
-                      value.toString(),
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                  );
-                },
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(
-            show: true,
-            horizontalInterval: 1,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.white.withOpacity(0.1),
-              strokeWidth: 1,
-            ),
-            drawVerticalLine: false,
-          ),
-          borderData: FlBorderData(show: false),
-          maxY: 10, // Maximum SPI is 10
-          barGroups: List.generate(_semesterSPIData.length, (index) {
-            final data = _semesterSPIData[index];
-            final spi = data['spi'] as double;
-            
-            return BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: spi,
-                  color: _getSPIColor(spi),
-                  width: 20,
-                  borderRadius: BorderRadius.circular(4),
-                  backDrawRodData: BackgroundBarChartRodData(
-                    show: true,
-                    toY: 10,
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                ),
-              ],
-            );
-          }),
-        ),
-        swapAnimationDuration: const Duration(milliseconds: 750),
-      ),
-    );
-  }
-  
-  // Get a color based on SPI value
-  Color _getSPIColor(double spi) {
-    if (spi >= 9) return Colors.greenAccent;
-    if (spi >= 8) return Colors.green;
-    if (spi >= 7) return Colors.lime;
-    if (spi >= 6) return Colors.amber;
-    if (spi >= 5) return Colors.orange;
-    return Colors.redAccent;
-  }
-
-  // Helper method to convert score back to grade for display
-  String _getGradeFromScore(double score) {
-    if (score >= 95) return 'AA';
-    if (score >= 85) return 'AB';
-    if (score >= 75) return 'BB';
-    if (score >= 65) return 'BC';
-    if (score >= 55) return 'CC';
-    if (score >= 45) return 'CD';
-    if (score >= 35) return 'DD';
-    if (score > 0) return 'FF';
-    return 'NA';
   }
 
   Widget _buildAnimatedRadarChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-  // Show loading indicator while fetching subject data
-  if (_isLoadingSubjectData) {
-    return const Center(
-      child: SizedBox(
-        height: 120,
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _graphAnimationController,
+      builder: (context, child) {
+        return SizedBox(
+          height: 150, // Decreased from 200 to make it even smaller
+          child: CustomPaint(
+            painter: RadarChartPainter(
+              subjects: ['HCD', 'OT', 'SE', 'AWT', 'CC', 'AJ'],
+              scores: [
+                85 * _graphAnimationController.value,
+                75 * _graphAnimationController.value,
+                80 * _graphAnimationController.value,
+                70 * _graphAnimationController.value,
+                65 * _graphAnimationController.value,
+                85 * _graphAnimationController.value,
+              ],
+              maxScore: 100,
+              backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
+              lineColor: const Color(0xFF03A9F4),
+              fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
+              colors: [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.teal],
+              context: context,
+            ),
+            size: const Size(double.infinity, 150), // Decreased from 200 to make it even smaller
+          ),
+        );
+      },
     );
   }
-  
-  // If there's no subject data available, show a message
-  if (_currentSemesterSubjects.isEmpty) {
-    return SizedBox(
-      height: 150,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.info_outline,
-              size: 40,
-              color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.5),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No subject data available',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
-              ),
-            ),
-            Text(
-              'Please check your academic records',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.5),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  // Reset animation if needed
-  if (!_graphAnimationController.isAnimating && _graphAnimationController.value == 0) {
-    _graphAnimationController.forward();
-  }
-
-  // Create animated radar chart with actual subject data
-  return AnimatedBuilder(
-    animation: _graphAnimationController,
-    builder: (context, child) {
-      // Create animated scores for the radar chart
-      final List<double> animatedScores = _currentSemesterScores.map((score) {
-        return score * _graphAnimationController.value;
-      }).toList();
-      
-      return SizedBox(
-        height: 200, // Increased height for better visibility and legend
-        child: Column(
-          children: [
-            Expanded(
-              child: CustomPaint(
-                painter: RadarChartPainter(
-                  subjects: _currentSemesterSubjects,
-                  scores: animatedScores,
-                  maxScore: 100,
-                  backgroundColor: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.2),
-                  lineColor: const Color(0xFF03A9F4),
-                  fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
-                  colors: _subjectColors,
-                  context: context,
-                ),
-                size: const Size(double.infinity, 140),
-              ),
-            ),
-            if (_currentSemesterNumber > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Text(
-                  'Semester $_currentSemesterNumber Subject Performance',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
-                  ),
-                ),
-              ),
-            // Add subject grade legend
-            if (_currentSemesterSubjects.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 12.0,
-                  runSpacing: 4.0,
-                  children: List.generate(
-                    _currentSemesterSubjects.length,
-                    (index) {
-                      final grade = _getGradeFromScore(_currentSemesterScores[index]);
-                      return Chip(
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        labelPadding: EdgeInsets.zero,
-                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                        backgroundColor: _subjectColors[index].withOpacity(0.1),
-                        side: BorderSide(color: _subjectColors[index], width: 1),
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: _subjectColors[index],
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _currentSemesterSubjects[index],
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).textTheme.bodyMedium?.color,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '($grade)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(context).textTheme.bodySmall?.color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    },
-  );
-}  
 
   Widget _buildAnimatedBarChart() {
     return TweenAnimationBuilder<double>(
@@ -2572,79 +1589,126 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // Events section removed as requested
+  Widget _buildEventsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upcoming Events',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.2) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
+                  width: 1,
+                ),
+              ),
+              child: DefaultTabController(
+                length: 2,
+                child: Column(
+                  children: [
+                    Container(
+                      height: 45,
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.05) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: TabBar(
+                        indicator: BoxDecoration(
+                          borderRadius: BorderRadius.circular(25),
+                          color: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.1) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF03A9F4).withOpacity(0.2),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        dividerColor: Colors.transparent,
+                        labelColor: Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                        unselectedLabelColor: Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.6) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6)),
+                        tabs: const [
+                          Tab(text: 'Academic'),
+                          Tab(text: 'Non-Academic'),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 200, // Reduced from 220 to 200
+                      child: TabBarView(
+                        children: [
+                          _buildEventsList(academicEvents),
+                          _buildEventsList(nonAcademicEvents),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
+// Custom painter for radar chart
 class RadarChartPainter extends CustomPainter {
   final List<String> subjects;
   final List<double> scores;
   final double maxScore;
   final Color backgroundColor;
-  final Color fillColor;
   final Color lineColor;
+  final Color fillColor;
   final List<Color>? colors;
   final BuildContext context;
-  
-  // Define paint objects once to avoid recreating them
-  late final Paint _backgroundPaint;
-  late final Paint _fillPaint;
-  late final Paint _linePaint;
-  late final Paint _axisPaint;
-  late final Paint _pointOutlinePaint;
-  late final Paint _pointFillPaint;
 
   RadarChartPainter({
     required this.subjects,
     required this.scores,
     required this.maxScore,
     required this.backgroundColor,
-    required this.fillColor,
     required this.lineColor,
+    required this.fillColor,
     this.colors,
     required this.context,
-  }) {
-    // Initialize Paint objects
-    _backgroundPaint = Paint()..color = backgroundColor;
-    
-    _fillPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-    
-    _linePaint = Paint()
-      ..color = lineColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-      
-    _axisPaint = Paint()
-      ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? 
-               (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black87)
-      ..strokeWidth = 1;
-    
-    _pointOutlinePaint = Paint()
-      ..color = Theme.of(context).textTheme.bodyLarge!.color ?? 
-               (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87);
-    
-    _pointFillPaint = Paint()
-      ..color = lineColor;
-  }
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.25; // Decreased from 0.35 to make the chart smaller
+    final radius = size.width * 0.35; // Decreased from 0.4
     
     // Draw background
-    canvas.drawCircle(center, radius, _backgroundPaint);
+    canvas.drawCircle(center, radius, Paint()..color = backgroundColor);
     
     // Draw concentric circles
     for (int i = 1; i <= 5; i++) {
       final circleRadius = radius * (i / 5);
-      final concCirclePaint = Paint()
-        ..color = isDark ? Colors.white.withOpacity(0.1) : Colors.black87
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1;
-      canvas.drawCircle(center, circleRadius, concCirclePaint);
+      canvas.drawCircle(
+        center,
+        circleRadius,
+        Paint()
+          ..color = isDark ? Colors.white.withOpacity(0.1) : Colors.black87
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
     }
     
     // Draw polygon for each data point
@@ -2664,10 +1728,21 @@ class RadarChartPainter extends CustomPainter {
     
     // Draw filled polygon
     final path = Path()..addPolygon(points, true);
-    canvas.drawPath(path, _fillPaint);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = fillColor
+        ..style = PaintingStyle.fill,
+    );
     
     // Draw polygon outline
-    canvas.drawPath(path, _linePaint);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = lineColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
     
     // Draw axis lines and labels
     for (int i = 0; i < sides; i++) {
@@ -2675,7 +1750,9 @@ class RadarChartPainter extends CustomPainter {
       final dx = center.dx + radius * math.cos(angle);
       final dy = center.dy + radius * math.sin(angle);
       
-      canvas.drawLine(center, Offset(dx, dy), _axisPaint);
+      canvas.drawLine(center, Offset(dx, dy), Paint()
+        ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black87)
+        ..strokeWidth = 1);
       
       // Draw subject labels with offset adjustment if provided
       double offsetX = 0;
@@ -2714,8 +1791,8 @@ class RadarChartPainter extends CustomPainter {
     
     // Draw points
     for (final point in points) {
-      canvas.drawCircle(point, 4, _pointOutlinePaint);
-      canvas.drawCircle(point, 3, _pointFillPaint);
+      canvas.drawCircle(point, 4, Paint()..color = Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87));
+      canvas.drawCircle(point, 3, Paint()..color = lineColor);
     }
   }
 
