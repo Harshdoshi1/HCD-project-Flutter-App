@@ -290,50 +290,97 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                   ),
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: Text(
-                          'Student',
-                          style: TextStyle(
-                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                            fontSize: 14,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedRole = 'student';
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Radio<String>(
+                                  value: 'student',
+                                  groupValue: _selectedRole,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedRole = value!;
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF03A9F4),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Student',
+                                    style: TextStyle(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        value: 'student',
-                        groupValue: _selectedRole,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedRole = value!;
-                          });
-                        },
-                        activeColor: const Color(0xFF03A9F4),
-                        dense: true,
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: Text(
-                          'Parent',
-                          style: TextStyle(
-                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                            fontSize: 14,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedRole = 'parent';
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Radio<String>(
+                                  value: 'parent',
+                                  groupValue: _selectedRole,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedRole = value!;
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF03A9F4),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Parent',
+                                    style: TextStyle(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        value: 'parent',
-                        groupValue: _selectedRole,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedRole = value!;
-                          });
-                        },
-                        activeColor: const Color(0xFF03A9F4),
-                        dense: true,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 8),
               ],
             ),
           ),
