@@ -8,6 +8,8 @@ class User {
   final int hardwarePoints;
   final int softwarePoints;
   final String? batch;
+  final String? studentName; // For parent role - name of the student
+  final String? studentEnrollment; // For parent role - enrollment of the student
 
   User({
     required this.id,
@@ -19,6 +21,8 @@ class User {
     this.hardwarePoints = 0,
     this.softwarePoints = 0,
     this.batch,
+    this.studentName,
+    this.studentEnrollment,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -39,6 +43,8 @@ class User {
           ? int.tryParse(json['softwarePoints'].toString()) ?? 0
           : 0,
       batch: json['batch']?.toString(),
+      studentName: json['studentName']?.toString(),
+      studentEnrollment: json['studentEnrollment']?.toString(),
     );
   }
 
@@ -52,5 +58,19 @@ class User {
     'hardwarePoints': hardwarePoints,
     'softwarePoints': softwarePoints,
     'batch': batch,
+    'studentName': studentName,
+    'studentEnrollment': studentEnrollment,
   };
+
+  // Helper methods for role checking
+  bool get isParent => role == 'parent';
+  bool get isStudent => role == 'student';
+  
+  // Get display name based on role
+  String get displayName {
+    if (isParent && studentName != null) {
+      return "$studentName's Parent";
+    }
+    return name;
+  }
 }

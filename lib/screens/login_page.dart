@@ -24,9 +24,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _obscurePassword = true;
   bool _useLocalTestingMode = false;
   final _authService = AuthService();
+  String _selectedRole = 'student'; // Default role
   
   final _emailController = TextEditingController();
-  final _enrollmentController = TextEditingController();
+  final _passwordController = TextEditingController();
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -81,7 +82,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   void dispose() {
     _animationController.dispose();
     _emailController.dispose();
-    _enrollmentController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -97,7 +98,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       try {
         final response = await _authService.login(
           _emailController.text,
-          _enrollmentController.text,
+          _passwordController.text,
           context,
         );
 
@@ -113,15 +114,30 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           await prefs.setString('userData', json.encode(user.toJson()));
         } else {
           print('Warning: User object is null in login response');
-          // Store basic info to prevent crashes
-          await prefs.setString('userData', json.encode({
+          // Store basic info to prevent crashes - handle parent role
+          final userData = {
             'id': '1',
-            'name': 'Test User',
+            'name': _selectedRole == 'parent' ? 'Parent' : 'Test User',
             'email': _emailController.text,
-            'enrollmentNumber': _enrollmentController.text,
+            'password': _passwordController.text,
             'currentSemester': 6,
-            'role': 'student',
-          }));
+            'role': _selectedRole,
+          };
+          
+          // If parent role, extract student name from email
+          if (_selectedRole == 'parent') {
+            final emailParts = _emailController.text.split('@');
+            if (emailParts.isNotEmpty) {
+              final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(emailParts.first);
+              if (nameMatch != null) {
+                final studentName = nameMatch.group(0)!;
+                userData['studentName'] = studentName[0].toUpperCase() + studentName.substring(1);
+                userData['studentEnrollment'] = 'AUTO_GENERATED';
+              }
+            }
+          }
+          
+          await prefs.setString('userData', json.encode(userData));
         }
         await prefs.setBool('isLoggedIn', true);
         
@@ -204,7 +220,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             ),
             decoration: InputDecoration(
               labelText: 'Email',
-              hintText: 'youremail@marwadieducation.edu.in',
+              hintText: _selectedRole == 'parent' 
+                  ? 'parent.email@marwadieducation.edu.in'
+                  : 'student.email@marwadieducation.edu.in',
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -247,28 +265,138 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           ),
           const SizedBox(height: 16),
           
-          // Enrollment Number Field
+          // Role Selection
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.3) 
+                  : Colors.black.withOpacity(0.3),
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, top: 8),
+                  child: Text(
+                    'Login as',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).brightness == Brightness.dark 
+                        ? Colors.white.withOpacity(0.7) 
+                        : Colors.black.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text(
+                          'Student',
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                            fontSize: 14,
+                          ),
+                        ),
+                        value: 'student',
+                        groupValue: _selectedRole,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedRole = value!;
+                          });
+                        },
+                        activeColor: const Color(0xFF03A9F4),
+                        dense: true,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text(
+                          'Parent',
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                            fontSize: 14,
+                          ),
+                        ),
+                        value: 'parent',
+                        groupValue: _selectedRole,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedRole = value!;
+                          });
+                        },
+                        activeColor: const Color(0xFF03A9F4),
+                        dense: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Password Field
           TextFormField(
-            controller: _enrollmentController,
+            controller: _passwordController,
+            obscureText: _obscurePassword,
             style: TextStyle(
               color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
             ),
             decoration: InputDecoration(
               labelText: 'Password',
+              hintText: 'Enter your password',
               prefixIcon: Icon(
-                Icons.numbers,
+                Icons.lock_outline,
                 color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.white.withOpacity(0.3) 
+                    : Colors.black.withOpacity(0.3),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF03A9F4),
+                  width: 2,
+                ),
+              ),
               labelStyle: TextStyle(
                 color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+              ),
+              hintStyle: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.3) 
+                  : Colors.black.withOpacity(0.3),
               ),
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your enrollment number';
+                return 'Please enter your password';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters long';
               }
               return null;
             },
