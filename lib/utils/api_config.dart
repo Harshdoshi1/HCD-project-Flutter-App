@@ -8,7 +8,7 @@ class ApiConfig {
   static bool useLocalMockData = false;
   
   // The physical machine's IP address on your local network
-  static const String _physicalMachineIp = '10.168.234.138';
+  static const String _physicalMachineIp = '192.168.218.178';
   
   // Configure whether to use local mock data
   static Future<void> setUseLocalMockData(bool value) async {
