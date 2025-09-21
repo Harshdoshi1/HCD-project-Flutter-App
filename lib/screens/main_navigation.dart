@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'dashboard.dart';
 import 'subjects_screen.dart';
 import 'rankings_screen.dart';
 import 'profile_screen.dart';
 import 'activities_screen.dart';
+import 'parent_dashboard.dart';
+import 'parent_subjects_ranking.dart';
+import 'parent_profile_screen.dart';
+import '../models/user_model.dart';
 
 class MainNavigation extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -22,23 +28,55 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   late int _selectedIndex;
+  User? _currentUser;
+  bool _isParent = false;
   
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialTabIndex;
+    _loadUserRole();
+  }
+  
+  Future<void> _loadUserRole() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataString = prefs.getString('userData');
+      if (userDataString != null) {
+        final userData = json.decode(userDataString);
+        _currentUser = User.fromJson(userData);
+        setState(() {
+          _isParent = _currentUser?.role == 'parent';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user role: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final List<Widget> pages = [
+    
+    // Role-based pages
+    final List<Widget> pages = _isParent ? [
+      ParentDashboardScreen(toggleTheme: widget.toggleTheme),
+      ParentSubjectsRankingScreen(toggleTheme: widget.toggleTheme),
+      ParentProfileScreen(toggleTheme: widget.toggleTheme, isDarkMode: isDark),
+    ] : [
       DashboardScreen(toggleTheme: widget.toggleTheme),
       SubjectsScreen(toggleTheme: widget.toggleTheme),
       RankingsScreen(toggleTheme: widget.toggleTheme),
       ActivitiesScreen(toggleTheme: widget.toggleTheme),
-      ProfileScreen(toggleTheme: widget.toggleTheme),
+      ProfileScreen(
+        toggleTheme: widget.toggleTheme,
+      ),
     ];
+    
+    // Adjust selected index for parent (fewer tabs)
+    if (_isParent && _selectedIndex >= pages.length) {
+      _selectedIndex = 0;
+    }
 
     return Scaffold(
       body: pages[_selectedIndex],
@@ -84,7 +122,20 @@ class _MainNavigationState extends State<MainNavigation> {
                 unselectedItemColor: isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
                 type: BottomNavigationBarType.fixed,
                 elevation: 0,
-                items: const [
+                items: _isParent ? const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.dashboard),
+                    label: 'Dashboard',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.school),
+                    label: 'Subjects',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.person),
+                    label: 'Profile',
+                  ),
+                ] : const [
                   BottomNavigationBarItem(
                     icon: Icon(Icons.dashboard),
                     label: 'Dashboard',

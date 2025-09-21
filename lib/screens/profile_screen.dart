@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
-
+  // Temporary comment to force recompilation
   const ProfileScreen({
     Key? key,
     required this.toggleTheme,

@@ -297,7 +297,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               MaterialPageRoute(
                                 builder: (context) => ProfileScreen(
                                   toggleTheme: widget.toggleTheme,
-                                  isDarkMode: Theme.of(context).brightness == Brightness.dark,
                                 ),
                               ),
                             );
