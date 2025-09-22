@@ -8,6 +8,9 @@ import 'parent_profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
 import '../models/student_ranking_model.dart';
+import '../utils/api_config.dart';
+import 'parent_academic_monitoring.dart';
+import 'parent_communication.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -142,7 +145,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
       
       if (token != null) {
         final response = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/academic/getAcademicDataByEmail'),
+          Uri.parse('${ApiConfig.baseUrl}/academic/getAcademicDataByEmail'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -176,7 +179,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
       if (token != null) {
         // Get total activity points
         final pointsResponse = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchTotalActivityPoints'),
+          Uri.parse('${ApiConfig.baseUrl}/events/fetchTotalActivityPoints'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -196,7 +199,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
         
         // Get recent activities
         final activitiesResponse = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchEventsbyEnrollandSemester'),
+          Uri.parse('${ApiConfig.baseUrl}/events/fetchEventsbyEnrollandSemester'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -228,7 +231,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
       
       if (token != null) {
         final response = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/student/getStudentComponentMarksAndSubjects'),
+          Uri.parse('${ApiConfig.baseUrl}/student/getStudentComponentMarksAndSubjects'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -511,6 +514,16 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
                             child: ScaleTransition(
                               scale: _scaleAnimation,
                               child: _buildProgressOverviewCard(isDark),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Quick Actions Card
+                          SlideTransition(
+                            position: _slideAnimation,
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: _buildQuickActionsCard(isDark),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -1145,6 +1158,293 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsCard(bool isDark) {
+    return _buildGlassCard(
+      title: 'Quick Actions',
+      icon: Icons.dashboard,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  'Academic Monitor',
+                  Icons.school,
+                  Colors.blue,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ParentAcademicMonitoringScreen(
+                        toggleTheme: widget.toggleTheme,
+                      ),
+                    ),
+                  ),
+                  isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  'Communications',
+                  Icons.message,
+                  Colors.green,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ParentCommunicationScreen(
+                        toggleTheme: widget.toggleTheme,
+                      ),
+                    ),
+                  ),
+                  isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  'Monthly Reports',
+                  Icons.description,
+                  Colors.purple,
+                  () => _showReportsDialog(isDark),
+                  isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  'Contact Faculty',
+                  Icons.contact_phone,
+                  Colors.orange,
+                  () => _showContactDialog(isDark),
+                  isDark,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      isDark: isDark,
+    );
+  }
+
+  Widget _buildActionButton(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+    bool isDark,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReportsDialog(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        title: Text(
+          'Monthly Reports',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: Text(
+                'January 2024 Report',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              subtitle: Text(
+                'Monthly progress summary',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(Icons.download, color: Color(0xFF03A9F4)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Downloading January 2024 report...'),
+                      backgroundColor: Color(0xFF03A9F4),
+                    ),
+                  );
+                },
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: Text(
+                'Semester Summary',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              subtitle: Text(
+                'Complete semester analysis',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(Icons.download, color: Color(0xFF03A9F4)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Downloading semester summary...'),
+                      backgroundColor: Color(0xFF03A9F4),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showContactDialog(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        title: Text(
+          'Contact Faculty',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.blue,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              title: Text(
+                'Dr. Sarah Johnson',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              subtitle: Text(
+                'Mathematics Department\nHead of Department',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(Icons.email, color: Color(0xFF03A9F4)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Opening email to Dr. Sarah Johnson...'),
+                      backgroundColor: Color(0xFF03A9F4),
+                    ),
+                  );
+                },
+              ),
+            ),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.green,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              title: Text(
+                'Prof. Michael Chen',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              subtitle: Text(
+                'Physics Department\nClass Coordinator',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(Icons.email, color: Color(0xFF03A9F4)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Opening email to Prof. Michael Chen...'),
+                      backgroundColor: Color(0xFF03A9F4),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
           ),
         ],
       ),

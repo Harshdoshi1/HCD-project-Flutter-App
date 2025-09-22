@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../utils/api_config.dart';
 
 class ParentSubjectsRankingScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -78,7 +79,7 @@ class _ParentSubjectsRankingScreenState extends State<ParentSubjectsRankingScree
       
       if (token != null) {
         final response = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/student/getStudentComponentMarksAndSubjects'),
+          Uri.parse('${ApiConfig.baseUrl}/student/getStudentComponentMarksAndSubjects'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',

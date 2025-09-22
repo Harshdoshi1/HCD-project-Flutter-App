@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../providers/user_provider.dart';
+import '../utils/api_config.dart';
 import 'splash_screen.dart';
 
 class ParentProfileScreen extends StatefulWidget {
@@ -130,7 +131,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> with SingleTi
       
       if (token != null) {
         final response = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/academic/getAcademicDataByEmail'),
+          Uri.parse('${ApiConfig.baseUrl}/academic/getAcademicDataByEmail'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -168,7 +169,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> with SingleTi
       
       if (token != null) {
         final response = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchTotalActivityPoints'),
+          Uri.parse('${ApiConfig.baseUrl}/events/fetchTotalActivityPoints'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -260,10 +261,10 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> with SingleTi
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          '$_studentName\'s Profile',
+          '👨‍👩‍👧‍👦 $_studentName\'s Profile (Parent View)',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 22,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),

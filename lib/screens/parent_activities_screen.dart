@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../providers/user_provider.dart';
+import '../utils/api_config.dart';
 
 class ParentActivitiesScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -116,8 +117,8 @@ class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with Si
       
       if (token != null && _currentSemester != null) {
         // Fetch activity points
-        final pointsResponse = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchTotalActivityPoints'),
+        final response = await http.post(
+          Uri.parse('${ApiConfig.baseUrl}/events/fetchTotalActivityPoints'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -125,8 +126,8 @@ class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with Si
           body: json.encode({'enrollmentNumber': enrollmentNumber}),
         );
         
-        if (pointsResponse.statusCode == 200) {
-          final pointsData = json.decode(pointsResponse.body);
+        if (response.statusCode == 200) {
+          final pointsData = json.decode(response.body);
           setState(() {
             _activitySummary['totalCocurricular'] = pointsData['totalCocurricularPoints'] ?? 0;
             _activitySummary['totalExtracurricular'] = pointsData['totalExtracurricularPoints'] ?? 0;
@@ -135,7 +136,7 @@ class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with Si
 
         // Fetch events by enrollment and semester
         final eventsResponse = await http.post(
-          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchEventsbyEnrollandSemester'),
+          Uri.parse('${ApiConfig.baseUrl}/events/fetchEventsbyEnrollandSemester'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',

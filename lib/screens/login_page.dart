@@ -111,7 +111,37 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         // Save the complete user data as JSON string
         final user = response['user'];
         if (user != null) {
-          await prefs.setString('userData', json.encode(user.toJson()));
+          // Create a new user data map with the correct role
+          final userData = {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'enrollmentNumber': user.enrollmentNumber,
+            'currentSemester': user.currentSemester,
+            'role': _selectedRole, // Use the selected role from UI
+            'hardwarePoints': user.hardwarePoints,
+            'softwarePoints': user.softwarePoints,
+            'batch': user.batch,
+          };
+          
+          // If parent role, add student info
+          if (_selectedRole == 'parent') {
+            final emailParts = _emailController.text.split('@');
+            if (emailParts.isNotEmpty) {
+              final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(emailParts.first);
+              if (nameMatch != null) {
+                final studentName = nameMatch.group(0)!;
+                userData['studentName'] = studentName[0].toUpperCase() + studentName.substring(1);
+                userData['studentEnrollment'] = user.enrollmentNumber;
+              }
+            }
+          }
+          
+          await prefs.setString('userData', json.encode(userData));
+          print('=== LOGIN DEBUG ===');
+          print('Selected role: $_selectedRole');
+          print('Saved user data: ${json.encode(userData)}');
+          print('==================');
         } else {
           print('Warning: User object is null in login response');
           // Store basic info to prevent crashes - handle parent role
@@ -269,25 +299,44 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           Container(
             decoration: BoxDecoration(
               border: Border.all(
-                color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.white.withOpacity(0.3) 
-                  : Colors.black.withOpacity(0.3),
+                color: _selectedRole == 'parent' ? Colors.orange : const Color(0xFF03A9F4),
+                width: 2,
               ),
               borderRadius: BorderRadius.circular(12),
+              color: (_selectedRole == 'parent' ? Colors.orange : const Color(0xFF03A9F4)).withOpacity(0.1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.only(left: 12, top: 8),
-                  child: Text(
-                    'Login as',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.white.withOpacity(0.7) 
-                        : Colors.black.withOpacity(0.7),
-                    ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Login as: ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.white.withOpacity(0.7) 
+                            : Colors.black.withOpacity(0.7),
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _selectedRole == 'parent' ? Colors.orange : const Color(0xFF03A9F4),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _selectedRole.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Padding(
