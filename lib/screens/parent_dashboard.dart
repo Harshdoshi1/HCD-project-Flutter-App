@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import 'parent_profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/user_provider.dart';
+import '../models/student_ranking_model.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -17,85 +22,289 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _scaleAnimation;
 
   String _studentName = 'Student';
   String _parentName = 'Parent';
+  String? _enrollmentNumber;
+  bool _isLoading = true;
+  String? _error;
 
-  // Simplified academic data for parents
-  final Map<String, dynamic> _academicSummary = {
-    'currentSemester': 6,
-    'latestCPI': 8.5,
-    'latestSPI': 8.2,
-    'currentRank': 15,
-    'totalStudents': 120,
-  };
+  // Real academic data from API
+  Map<String, dynamic>? _academicData;
+  List<dynamic> _recentActivities = [];
+  Map<String, dynamic>? _currentSemesterData;
+  List<Map<String, dynamic>> _gradeAlerts = [];
+  int _totalCocurricularPoints = 0;
+  int _totalExtracurricularPoints = 0;
 
-  // ICT Department Goals
-  final List<Map<String, dynamic>> _ictGoals = [
+
+  // Career Goals and Pathways
+  final List<Map<String, dynamic>> _careerGoals = [
     {
-      'title': 'Internships',
-      'description': '100% placement assistance',
-      'icon': Icons.work,
+      'title': 'Technical Skills',
+      'description': 'Programming & Development',
+      'icon': Icons.code,
       'color': Colors.blue,
-      'progress': 0.85,
+      'currentLevel': 'Intermediate',
+      'targetLevel': 'Advanced',
     },
     {
-      'title': 'Workshops',
-      'description': 'Industry-relevant training',
-      'icon': Icons.school,
+      'title': 'Industry Readiness',
+      'description': 'Internships & Projects',
+      'icon': Icons.work,
       'color': Colors.green,
-      'progress': 0.92,
+      'currentLevel': 'Developing',
+      'targetLevel': 'Industry Ready',
     },
     {
-      'title': 'Placements',
-      'description': 'Top company partnerships',
-      'icon': Icons.business,
+      'title': 'Leadership Skills',
+      'description': 'Club Activities & Events',
+      'icon': Icons.groups,
       'color': Colors.orange,
-      'progress': 0.78,
+      'currentLevel': 'Participating',
+      'targetLevel': 'Leading',
+    },
+    {
+      'title': 'Academic Excellence',
+      'description': 'Maintain High CPI/SPI',
+      'icon': Icons.school,
+      'color': Colors.purple,
+      'currentLevel': 'Good',
+      'targetLevel': 'Excellent',
     },
   ];
 
-  // Upcoming events (simplified for parents)
-  final List<Map<String, dynamic>> _upcomingEvents = [
-    {
-      'title': 'Parent-Teacher Meeting',
-      'date': 'Apr 25, 2025',
-      'icon': Icons.people,
-      'color': Colors.purple,
-    },
-    {
-      'title': 'Final Examinations',
-      'date': 'May 15, 2025',
-      'icon': Icons.assignment,
-      'color': Colors.red,
-    },
-    {
-      'title': 'Results Declaration',
-      'date': 'May 30, 2025',
-      'icon': Icons.grade,
-      'color': Colors.green,
-    },
-  ];
 
   Future<void> _loadUserData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('userEmail') ?? '';
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
       
-      if (userEmail.isNotEmpty) {
-        // Extract student name from email for parent
-        final nameMatch = RegExp(r'^([a-zA-Z]+)').firstMatch(userEmail.split('@').first);
-        if (nameMatch != null && nameMatch.group(0) != null) {
+      if (user != null) {
+        setState(() {
+          _studentName = user.name;
+          _enrollmentNumber = user.enrollmentNumber;
+          _parentName = "${user.name}'s Parent";
+        });
+        
+        // Load academic data
+        await _loadAcademicData(user.email);
+        
+        // Load activity data
+        await _loadActivityData(user.enrollmentNumber);
+        
+        // Load current semester subjects for grade alerts
+        await _loadCurrentSemesterData(user.email);
+      } else {
+        // Fallback to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final userData = prefs.getString('userData');
+        
+        if (userData != null) {
+          final decodedData = json.decode(userData);
           setState(() {
-            _studentName = nameMatch.group(0)!;
-            _studentName = _studentName[0].toUpperCase() + _studentName.substring(1);
-            _parentName = "$_studentName's Parent";
+            _studentName = decodedData['name'] ?? 'Student';
+            _enrollmentNumber = decodedData['enrollmentNumber'];
+            _parentName = "${_studentName}'s Parent";
+          });
+          
+          final email = decodedData['email'];
+          if (email != null) {
+            await _loadAcademicData(email);
+            await _loadActivityData(_enrollmentNumber!);
+            await _loadCurrentSemesterData(email);
+          }
+        }
+      }
+      
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadAcademicData(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token != null) {
+        final response = await http.post(
+          Uri.parse('https://hcdbackend.vercel.app/api/academic/getAcademicDataByEmail'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({'email': email}),
+        );
+        
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          setState(() {
+            _academicData = {
+              'currentSemester': data['currentSemester'] ?? 6,
+              'latestCPI': data['latestCPI'] ?? 0.0,
+              'latestSPI': data['latestSPI'] ?? 0.0,
+              'currentRank': data['latestRank'] ?? 0,
+              'enrollmentNumber': data['enrollmentNumber'] ?? '',
+            };
           });
         }
       }
     } catch (e) {
-      debugPrint('Error loading user data: $e');
+      debugPrint('Error loading academic data: $e');
     }
+  }
+
+  Future<void> _loadActivityData(String enrollmentNumber) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token != null) {
+        // Get total activity points
+        final pointsResponse = await http.post(
+          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchTotalActivityPoints'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({
+            'enrollmentNumber': enrollmentNumber,
+          }),
+        );
+        
+        if (pointsResponse.statusCode == 200) {
+          final pointsData = json.decode(pointsResponse.body);
+          setState(() {
+            _totalCocurricularPoints = pointsData['totalCocurricular'] ?? 0;
+            _totalExtracurricularPoints = pointsData['totalExtracurricular'] ?? 0;
+          });
+        }
+        
+        // Get recent activities
+        final activitiesResponse = await http.post(
+          Uri.parse('https://hcdbackend.vercel.app/api/events/fetchEventsbyEnrollandSemester'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({
+            'enrollmentNumber': enrollmentNumber,
+            'semester': 'all'
+          }),
+        );
+        
+        if (activitiesResponse.statusCode == 200) {
+          final data = json.decode(activitiesResponse.body);
+          if (data is List) {
+            setState(() {
+              _recentActivities = data.take(3).toList(); // Get last 3 activities
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading activity data: $e');
+    }
+  }
+
+  Future<void> _loadCurrentSemesterData(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token != null) {
+        final response = await http.post(
+          Uri.parse('https://hcdbackend.vercel.app/api/student/getStudentComponentMarksAndSubjects'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({'email': email}),
+        );
+        
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data != null && data.containsKey('semesters')) {
+            final List<dynamic> semesters = data['semesters'];
+            if (semesters.isNotEmpty) {
+              // Get current semester (highest semester number)
+              Map<String, dynamic>? currentSemester;
+              int highestSemester = 0;
+              
+              for (var semester in semesters) {
+                final semesterNumber = int.tryParse(semester['semesterNumber'].toString()) ?? 0;
+                if (semesterNumber > highestSemester) {
+                  highestSemester = semesterNumber;
+                  currentSemester = semester;
+                }
+              }
+              
+              if (currentSemester != null) {
+                setState(() {
+                  _currentSemesterData = currentSemester;
+                  _generateGradeAlerts(currentSemester!);
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading current semester data: $e');
+    }
+  }
+
+  void _generateGradeAlerts(Map<String, dynamic> semesterData) {
+    final List<Map<String, dynamic>> alerts = [];
+    
+    if (semesterData.containsKey('subjects')) {
+      final List<dynamic> subjects = semesterData['subjects'];
+      
+      for (var subject in subjects) {
+        final String subjectName = subject['subjectName'] ?? 'Unknown';
+        final String grade = subject['grade'] ?? 'NA';
+        
+        // Check for low grades
+        if (grade == 'C' || grade == 'D' || grade == 'F' || grade == 'FF') {
+          alerts.add({
+            'type': 'warning',
+            'title': 'Low Grade Alert',
+            'message': '$subjectName: Grade $grade needs attention',
+            'color': Colors.orange,
+            'icon': Icons.warning,
+          });
+        }
+        
+        // Check for excellent performance
+        if (grade == 'A+' || grade == 'O') {
+          alerts.add({
+            'type': 'success',
+            'title': 'Excellent Performance',
+            'message': '$subjectName: Outstanding grade $grade!',
+            'color': Colors.green,
+            'icon': Icons.star,
+          });
+        }
+      }
+    }
+    
+    setState(() {
+      _gradeAlerts = alerts;
+    });
   }
 
   @override
@@ -103,15 +312,19 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
 
     _animationController.forward();
@@ -228,26 +441,81 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
                     ),
                     const SizedBox(height: 24),
                     
-                    // Academic Summary Card
-                    SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildAcademicSummaryCard(isDark),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // ICT Department Goals Card
-                    SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildICTGoalsCard(isDark),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Upcoming Events Card
-                    SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildUpcomingEventsCard(isDark),
-                    ),
-                    const SizedBox(height: 16),
+                    if (_isLoading)
+                      Center(
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(color: Color(0xFF03A9F4)),
+                            SizedBox(height: 16),
+                            Text(
+                              'Loading student data...',
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (_error != null)
+                      _buildErrorWidget(isDark)
+                    else
+                      Column(
+                        children: [
+                          // Grade Alerts Card (if any)
+                          if (_gradeAlerts.isNotEmpty) ...[
+                            SlideTransition(
+                              position: _slideAnimation,
+                              child: ScaleTransition(
+                                scale: _scaleAnimation,
+                                child: _buildGradeAlertsCard(isDark),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          
+                          // Academic Summary Card
+                          SlideTransition(
+                            position: _slideAnimation,
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: _buildAcademicSummaryCard(isDark),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Career Goals Card
+                          SlideTransition(
+                            position: _slideAnimation,
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: _buildCareerGoalsCard(isDark),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Recent Activities Card
+                          if (_recentActivities.isNotEmpty) ...[
+                            SlideTransition(
+                              position: _slideAnimation,
+                              child: ScaleTransition(
+                                scale: _scaleAnimation,
+                                child: _buildRecentActivitiesCard(isDark),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          
+                          // Student Progress Overview
+                          SlideTransition(
+                            position: _slideAnimation,
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: _buildProgressOverviewCard(isDark),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -258,7 +526,98 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
     );
   }
 
+  Widget _buildErrorWidget(bool isDark) {
+    return _buildGlassCard(
+      title: 'Error Loading Data',
+      icon: Icons.error_outline,
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: Colors.red,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Unable to load student data. Please check your connection and try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadUserData,
+            child: Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF03A9F4),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+      isDark: isDark,
+    );
+  }
+
+  Widget _buildGradeAlertsCard(bool isDark) {
+    return _buildGlassCard(
+      title: 'Grade Alerts',
+      icon: Icons.notifications_active,
+      child: Column(
+        children: _gradeAlerts.map((alert) => _buildAlertItem(alert, isDark)).toList(),
+      ),
+      isDark: isDark,
+    );
+  }
+
+  Widget _buildAlertItem(Map<String, dynamic> alert, bool isDark) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: (alert['color'] as Color).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: (alert['color'] as Color).withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            alert['icon'],
+            color: alert['color'],
+            size: 24,
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  alert['title'],
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                Text(
+                  alert['message'],
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAcademicSummaryCard(bool isDark) {
+    final academicData = _academicData ?? {};
     return _buildGlassCard(
       title: '$_studentName\'s Academic Summary',
       icon: Icons.school,
@@ -267,16 +626,16 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSummaryItem('Current CPI', '${_academicSummary['latestCPI']}', Colors.blue, isDark),
-              _buildSummaryItem('Current SPI', '${_academicSummary['latestSPI']}', Colors.green, isDark),
+              _buildSummaryItem('Current CPI', '${academicData['latestCPI'] ?? 'N/A'}', Colors.blue, isDark),
+              _buildSummaryItem('Current SPI', '${academicData['latestSPI'] ?? 'N/A'}', Colors.green, isDark),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSummaryItem('Class Rank', '${_academicSummary['currentRank']}', Colors.orange, isDark),
-              _buildSummaryItem('Semester', '${_academicSummary['currentSemester']}', Colors.purple, isDark),
+              _buildSummaryItem('Class Rank', '${academicData['currentRank'] ?? 'N/A'}', Colors.orange, isDark),
+              _buildSummaryItem('Semester', '${academicData['currentSemester'] ?? 'N/A'}', Colors.purple, isDark),
             ],
           ),
         ],
@@ -285,27 +644,329 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
     );
   }
 
-  Widget _buildICTGoalsCard(bool isDark) {
+  Widget _buildCareerGoalsCard(bool isDark) {
     return _buildGlassCard(
-      title: 'ICT Department Goals',
+      title: 'Career Development Goals',
       icon: Icons.flag,
       child: Column(
-        children: _ictGoals.map((goal) => _buildGoalItem(goal, isDark)).toList(),
+        children: _careerGoals.map((goal) => _buildCareerGoalItem(goal, isDark)).toList(),
       ),
       isDark: isDark,
     );
   }
 
-  Widget _buildUpcomingEventsCard(bool isDark) {
+  Widget _buildCareerGoalItem(Map<String, dynamic> goal, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: (goal['color'] as Color).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (goal['color'] as Color).withOpacity(0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (goal['color'] as Color).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                goal['icon'],
+                color: goal['color'],
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    goal['title'],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  Text(
+                    goal['description'],
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        'Current: ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white60 : Colors.black45,
+                        ),
+                      ),
+                      Text(
+                        goal['currentLevel'],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: goal['color'],
+                        ),
+                      ),
+                      Text(
+                        ' → Target: ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white60 : Colors.black45,
+                        ),
+                      ),
+                      Text(
+                        goal['targetLevel'],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentActivitiesCard(bool isDark) {
     return _buildGlassCard(
-      title: 'Important Dates',
-      icon: Icons.event,
+      title: 'Recent Activities',
+      icon: Icons.event_note,
       child: Column(
-        children: _upcomingEvents.map((event) => _buildEventItem(event, isDark)).toList(),
+        children: [
+          if (_recentActivities.isEmpty)
+            Text(
+              'No recent activities found',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            )
+          else
+            ..._recentActivities.map((activity) => _buildActivityItem(activity, isDark)).toList(),
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildPointsItem('Co-curricular', _totalCocurricularPoints, Colors.blue, isDark),
+              _buildPointsItem('Extra-curricular', _totalExtracurricularPoints, Colors.green, isDark),
+            ],
+          ),
+        ],
       ),
       isDark: isDark,
     );
   }
+
+  Widget _buildActivityItem(Map<String, dynamic> activity, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.event,
+              color: Colors.blue,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activity['eventName'] ?? 'Event',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                Text(
+                  '${activity['points'] ?? 0} points • ${activity['eventDate'] ?? 'Date not available'}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPointsItem(String label, int points, Color color, bool isDark) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            points.toString(),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: isDark ? Colors.white70 : Colors.black54,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressOverviewCard(bool isDark) {
+    return _buildGlassCard(
+      title: 'Student Progress Overview',
+      icon: Icons.trending_up,
+      child: Column(
+        children: [
+          _buildProgressItem(
+            'Academic Performance',
+            _getAcademicPerformanceLevel(),
+            _getAcademicPerformanceColor(),
+            isDark,
+          ),
+          SizedBox(height: 12),
+          _buildProgressItem(
+            'Activity Participation',
+            _getActivityParticipationLevel(),
+            _getActivityParticipationColor(),
+            isDark,
+          ),
+          SizedBox(height: 12),
+          _buildProgressItem(
+            'Overall Development',
+            _getOverallDevelopmentLevel(),
+            _getOverallDevelopmentColor(),
+            isDark,
+          ),
+        ],
+      ),
+      isDark: isDark,
+    );
+  }
+
+  Widget _buildProgressItem(String title, String level, Color color, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Text(
+            level,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getAcademicPerformanceLevel() {
+    final cpi = _academicData?['latestCPI'] ?? 0.0;
+    if (cpi >= 9.0) return 'Excellent';
+    if (cpi >= 8.0) return 'Very Good';
+    if (cpi >= 7.0) return 'Good';
+    if (cpi >= 6.0) return 'Average';
+    return 'Needs Improvement';
+  }
+
+  Color _getAcademicPerformanceColor() {
+    final cpi = _academicData?['latestCPI'] ?? 0.0;
+    if (cpi >= 9.0) return Colors.green;
+    if (cpi >= 8.0) return Colors.lightGreen;
+    if (cpi >= 7.0) return Colors.orange;
+    if (cpi >= 6.0) return Colors.amber;
+    return Colors.red;
+  }
+
+  String _getActivityParticipationLevel() {
+    final totalPoints = _totalCocurricularPoints + _totalExtracurricularPoints;
+    if (totalPoints >= 100) return 'Highly Active';
+    if (totalPoints >= 50) return 'Active';
+    if (totalPoints >= 20) return 'Moderate';
+    if (totalPoints > 0) return 'Low';
+    return 'Inactive';
+  }
+
+  Color _getActivityParticipationColor() {
+    final totalPoints = _totalCocurricularPoints + _totalExtracurricularPoints;
+    if (totalPoints >= 100) return Colors.green;
+    if (totalPoints >= 50) return Colors.lightGreen;
+    if (totalPoints >= 20) return Colors.orange;
+    if (totalPoints > 0) return Colors.amber;
+    return Colors.red;
+  }
+
+  String _getOverallDevelopmentLevel() {
+    final academicLevel = _getAcademicPerformanceLevel();
+    final activityLevel = _getActivityParticipationLevel();
+    
+    if (academicLevel == 'Excellent' && (activityLevel == 'Highly Active' || activityLevel == 'Active')) {
+      return 'Outstanding';
+    }
+    if (academicLevel == 'Very Good' || academicLevel == 'Good') {
+      return 'Good Progress';
+    }
+    return 'Developing';
+  }
+
+  Color _getOverallDevelopmentColor() {
+    final level = _getOverallDevelopmentLevel();
+    if (level == 'Outstanding') return Colors.green;
+    if (level == 'Good Progress') return Colors.lightGreen;
+    return Colors.orange;
+  }
+
 
   Widget _buildGlassCard({
     required String title,

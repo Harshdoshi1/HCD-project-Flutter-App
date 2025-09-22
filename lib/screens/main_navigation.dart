@@ -9,6 +9,7 @@ import 'profile_screen.dart';
 import 'activities_screen.dart';
 import 'parent_dashboard.dart';
 import 'parent_subjects_ranking.dart';
+import 'parent_activities_screen.dart';
 import 'parent_profile_screen.dart';
 import '../models/user_model.dart';
 
@@ -62,6 +63,7 @@ class _MainNavigationState extends State<MainNavigation> {
     final List<Widget> pages = _isParent ? [
       ParentDashboardScreen(toggleTheme: widget.toggleTheme),
       ParentSubjectsRankingScreen(toggleTheme: widget.toggleTheme),
+      ParentActivitiesScreen(toggleTheme: widget.toggleTheme),
       ParentProfileScreen(toggleTheme: widget.toggleTheme, isDarkMode: isDark),
     ] : [
       DashboardScreen(toggleTheme: widget.toggleTheme),
@@ -130,6 +132,10 @@ class _MainNavigationState extends State<MainNavigation> {
                   BottomNavigationBarItem(
                     icon: Icon(Icons.school),
                     label: 'Subjects',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.event),
+                    label: 'Activities',
                   ),
                   BottomNavigationBarItem(
                     icon: Icon(Icons.person),
