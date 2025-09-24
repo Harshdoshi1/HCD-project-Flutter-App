@@ -83,8 +83,8 @@ class SemesterData {
       semesterNumber: json['semesterNumber'],
       startDate: json['startDate'],
       endDate: json['endDate'],
-      cpi: json['cpi'] != null ? json['cpi'].toDouble() : null,
-      spi: json['spi'] != null ? json['spi'].toDouble() : null,
+      cpi: json['cpi']?.toDouble(),
+      spi: json['spi']?.toDouble(),
       rank: json['rank'],
       subjects: (json['subjects'] as List)
           .map((subject) => SubjectData.fromJson(subject))
@@ -130,11 +130,11 @@ class SubjectData {
 }
 
 class ComponentMarks {
-  final int? ese;
-  final int? cse;
-  final int? ia;
-  final int? tw;
-  final int? viva;
+  final double? ese;
+  final double? cse;
+  final double? ia;
+  final double? tw;
+  final double? viva;
 
   ComponentMarks({
     this.ese,
@@ -146,21 +146,21 @@ class ComponentMarks {
 
   factory ComponentMarks.fromJson(Map<String, dynamic> json) {
     return ComponentMarks(
-      ese: json['ese'],
-      cse: json['cse'],
-      ia: json['ia'],
-      tw: json['tw'],
-      viva: json['viva'],
+      ese: json['ese']?.toDouble(),
+      cse: json['cse']?.toDouble(),
+      ia: json['ia']?.toDouble(),
+      tw: json['tw']?.toDouble(),
+      viva: json['viva']?.toDouble(),
     );
   }
 }
 
 class ComponentWeightage {
-  final int? ese;
-  final int? cse;
-  final int? ia;
-  final int? tw;
-  final int? viva;
+  final double? ese;
+  final double? cse;
+  final double? ia;
+  final double? tw;
+  final double? viva;
 
   ComponentWeightage({
     this.ese,
@@ -172,11 +172,11 @@ class ComponentWeightage {
 
   factory ComponentWeightage.fromJson(Map<String, dynamic> json) {
     return ComponentWeightage(
-      ese: json['ese'],
-      cse: json['cse'],
-      ia: json['ia'],
-      tw: json['tw'],
-      viva: json['viva'],
+      ese: json['ese']?.toDouble(),
+      cse: json['cse']?.toDouble(),
+      ia: json['ia']?.toDouble(),
+      tw: json['tw']?.toDouble(),
+      viva: json['viva']?.toDouble(),
     );
   }
 }

@@ -1,18 +1,21 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:ui' show window;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
   // Flag to indicate whether to use local mock data instead of real API calls
   static bool useLocalMockData = false;
   
-  // The physical machine's IP address on your local network
-  static const String _physicalMachineIp = '192.168.115.178';
-   
-    // static const String _physicalMachineIp = '10.26.143.178';
-
+  // Production API URL - Replace with your actual Render deployment URL
+  static const String _productionApiUrl = 'https://hcd-project-1.onrender.com/api';
   
+  // Development/Local API configuration (kept for local development)
+  static const String _localApiUrl = 'http://localhost:5001/api';
+  static const String _physicalMachineIp = '10.24.61.75';
+  
+  // Flag to determine whether to use production or local API
+  static const bool useProductionApi = true; // Set to false for local development
+
   // Configure whether to use local mock data
   static Future<void> setUseLocalMockData(bool value) async {
     useLocalMockData = value;
@@ -33,9 +36,16 @@ class ApiConfig {
     if (useLocalMockData) {
       return 'http://local-mock-data/api';
     }
+    
+    // If production API is enabled, use it for all platforms
+    if (useProductionApi) {
+      return _productionApiUrl;
+    }
+    
+    // Local development configuration
     // For web or desktop - use localhost
     if (kIsWeb || Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      return 'http://localhost:5001/api';
+      return _localApiUrl;
     }
     // For Android
     else if (Platform.isAndroid) {
@@ -48,7 +58,7 @@ class ApiConfig {
       return 'http://$_physicalMachineIp:5001/api';
     }
     // Default fallback
-    return 'http://localhost:5001/api';
+    return _localApiUrl;
   }
 
   /// Returns the appropriate full URL for a specific endpoint
@@ -59,5 +69,27 @@ class ApiConfig {
     }
     
     return '$baseUrl/$endpoint';
+  }
+
+  /// Utility method to get the current API mode
+  static String get currentApiMode {
+    if (useLocalMockData) return 'Mock Data';
+    if (useProductionApi) return 'Production (Render)';
+    return 'Local Development';
+  }
+
+  /// Utility method to get the current base URL being used
+  static String get currentBaseUrl => baseUrl;
+
+  /// Method to easily switch to production mode
+  static void enableProductionMode() {
+    // Note: This requires changing the const value and rebuilding the app
+    // For runtime switching, you'd need to make useProductionApi non-const
+  }
+
+  /// Method to easily switch to development mode  
+  static void enableDevelopmentMode() {
+    // Note: This requires changing the const value and rebuilding the app
+    // For runtime switching, you'd need to make useProductionApi non-const
   }
 }

@@ -322,14 +322,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: _selectedRole == 'parent' ? Colors.orange : const Color(0xFF03A9F4),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           _selectedRole.toUpperCase(),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
