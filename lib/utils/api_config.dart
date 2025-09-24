@@ -1,6 +1,5 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:ui' show window;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
@@ -8,11 +7,12 @@ class ApiConfig {
   static bool useLocalMockData = false;
   
   // The physical machine's IP address on your local network
-  static const String _physicalMachineIp = '192.168.218.178';
+  // static const String _physicalMachineIp = '192.168.218.178';
    
-    // static const String _physicalMachineIp = '10.26.143.178';
+  // static const String _physicalMachineIp = '10.26.143.75';
 
-  
+  static const String _physicalMachineIp = '10.24.61.75';
+
   // Configure whether to use local mock data
   static Future<void> setUseLocalMockData(bool value) async {
     useLocalMockData = value;

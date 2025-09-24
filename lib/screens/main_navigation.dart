@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'dashboard.dart';
-import 'subjects_screen.dart';
-import 'rankings_screen.dart';
-import 'profile_screen.dart';
-import 'activities_screen.dart';
-import 'parent_dashboard.dart';
-import 'parent_subjects_ranking.dart';
-import 'parent_activities_screen.dart';
-import 'parent_profile_screen.dart';
+import 'student/dashboard.dart';
+import 'student/subjects_screen.dart';
+import 'student/rankings_screen.dart';
+import 'student/profile_screen.dart';
+import 'student/activities_screen.dart';
+import 'parent/parent_dashboard.dart';
+import 'parent/parent_subjects_ranking.dart';
+import 'parent/parent_activities_screen.dart';
+import 'parent/parent_profile_screen.dart';
 import '../models/user_model.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -18,10 +18,10 @@ class MainNavigation extends StatefulWidget {
   final int initialTabIndex;
   
   const MainNavigation({
-    Key? key, 
+    super.key, 
     required this.toggleTheme,
     this.initialTabIndex = 0,
-  }) : super(key: key);
+  });
 
   @override
   _MainNavigationState createState() => _MainNavigationState();

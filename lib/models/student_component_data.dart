@@ -83,8 +83,8 @@ class SemesterData {
       semesterNumber: json['semesterNumber'],
       startDate: json['startDate'],
       endDate: json['endDate'],
-      cpi: json['cpi'] != null ? json['cpi'].toDouble() : null,
-      spi: json['spi'] != null ? json['spi'].toDouble() : null,
+      cpi: json['cpi']?.toDouble(),
+      spi: json['spi']?.toDouble(),
       rank: json['rank'],
       subjects: (json['subjects'] as List)
           .map((subject) => SubjectData.fromJson(subject))

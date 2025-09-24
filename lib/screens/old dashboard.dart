@@ -4,20 +4,20 @@ import 'package:fl_chart/fl_chart.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:io';
-import 'profile_screen.dart';
+import 'student/profile_screen.dart';
 import '../constants/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class DashboardScreen extends StatefulWidget {
+class OldDashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
   
-  const DashboardScreen({Key? key, required this.toggleTheme}) : super(key: key);
+  const OldDashboardScreen({super.key, required this.toggleTheme});
 
   @override
-  _DashboardScreenState createState() => _DashboardScreenState();
+  _OldDashboardScreenState createState() => _OldDashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class _OldDashboardScreenState extends State<OldDashboardScreen> with SingleTickerProviderStateMixin {
   String _activeGraph = 'sgpa';
   late AnimationController _graphAnimationController;
   late Animation<double> _fadeAnimation;
@@ -240,7 +240,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   const Color(0xFF03A9F4),
                   Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
                 ],
-                stops: [0.0, 0.3],
+                stops: const [0.0, 0.3],
               ),
             ),
           ),
@@ -275,10 +275,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Container(
+                          SizedBox(
                             width: MediaQuery.of(context).size.width * 0.6,
                             child: Text(
-                              '"${_dailyQuote}"',
+                              '"$_dailyQuote"',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
@@ -487,8 +487,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF03A9F4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF03A9F4),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -578,11 +578,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       fontSize: fontSize,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                      shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+                      shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
                     ),
                     badgeWidget: Text(
                       data['domain'],
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -660,7 +660,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
                               languages[value.toInt()],
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 10,
@@ -689,7 +689,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         }
                         return Text(
                           text,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
                           ),
@@ -698,8 +698,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       reservedSize: 30,
                     ),
                   ),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 borderData: FlBorderData(show: false),
                 gridData: FlGridData(
@@ -1246,8 +1246,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF03A9F4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF03A9F4),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1380,7 +1380,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               lineColor: const Color(0xFF03A9F4),
               fillColor: const Color(0xFF03A9F4).withOpacity(0.2),
               colors: [Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.red, Colors.teal],
-              context: context,
+              isDarkMode: isDark,
+              textColor: isDark ? Colors.white : Colors.black,
             ),
             size: const Size(double.infinity, 150), // Decreased from 200 to make it even smaller
           ),
@@ -1444,7 +1445,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                       children: <TextSpan>[
                         TextSpan(
-                          text: '${(rod.toY * value).toStringAsFixed(1)}',
+                          text: (rod.toY * value).toStringAsFixed(1),
                           style: TextStyle(
                             color: Theme.of(context).brightness == Brightness.dark ? Colors.yellow : Colors.blue,
                             fontSize: 16,
@@ -1525,10 +1526,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     reservedSize: 30,
                   ),
                 ),
-                topTitles: AxisTitles(
+                topTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
-                rightTitles: AxisTitles(
+                rightTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
               ),
@@ -1675,7 +1676,8 @@ class RadarChartPainter extends CustomPainter {
   final Color lineColor;
   final Color fillColor;
   final List<Color>? colors;
-  final BuildContext context;
+  final bool isDarkMode;
+  final Color textColor;
 
   RadarChartPainter({
     required this.subjects,
@@ -1685,12 +1687,12 @@ class RadarChartPainter extends CustomPainter {
     required this.lineColor,
     required this.fillColor,
     this.colors,
-    required this.context,
+    required this.isDarkMode,
+    required this.textColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width * 0.35; // Decreased from 0.4
     
@@ -1704,7 +1706,7 @@ class RadarChartPainter extends CustomPainter {
         center,
         circleRadius,
         Paint()
-          ..color = isDark ? Colors.white.withOpacity(0.1) : Colors.black87
+          ..color = isDarkMode ? Colors.white.withOpacity(0.1) : Colors.black87
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1,
       );
@@ -1750,7 +1752,7 @@ class RadarChartPainter extends CustomPainter {
       final dy = center.dy + radius * math.sin(angle);
       
       canvas.drawLine(center, Offset(dx, dy), Paint()
-        ..color = Theme.of(context).textTheme.bodyLarge!.color!.withOpacity(0.3) ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black87)
+        ..color = isDarkMode ? Colors.white.withOpacity(0.3) : Colors.black87
         ..strokeWidth = 1);
       
       // Draw subject labels with offset adjustment if provided
@@ -1772,7 +1774,7 @@ class RadarChartPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: subjects[i],
         style: TextStyle(
-          color: colors != null ? colors![i] : Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+          color: colors != null ? colors![i] : textColor,
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -1790,7 +1792,7 @@ class RadarChartPainter extends CustomPainter {
     
     // Draw points
     for (final point in points) {
-      canvas.drawCircle(point, 4, Paint()..color = Theme.of(context).textTheme.bodyLarge!.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87));
+      canvas.drawCircle(point, 4, Paint()..color = textColor);
       canvas.drawCircle(point, 3, Paint()..color = lineColor);
     }
   }
