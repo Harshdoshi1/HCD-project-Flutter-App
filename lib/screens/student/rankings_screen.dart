@@ -25,6 +25,29 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   
+  // Helper method to convert number to ordinal
+  String _getOrdinalNumber(int number) {
+    if (number <= 0) return '${number}th';
+    
+    final lastDigit = number % 10;
+    final lastTwoDigits = number % 100;
+    
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+      return '${number}th';
+    }
+    
+    switch (lastDigit) {
+      case 1:
+        return '${number}st';
+      case 2:
+        return '${number}nd';
+      case 3:
+        return '${number}rd';
+      default:
+        return '${number}th';
+    }
+  }
+  
   // Student data
   final StudentService _studentService = StudentService();
   List<StudentRanking> _students = [];
@@ -221,43 +244,118 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
           SafeArea(
             child: Column(
               children: [
-                // Tab bar
+                // Enhanced Tab bar with better UI
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  height: 45,
+                  height: 50,
                   decoration: BoxDecoration(
-                    color: isDark 
-                        ? Colors.white.withOpacity(0.05) 
-                        : Colors.black.withOpacity(0.05),
+                    gradient: LinearGradient(
+                      colors: [
+                        isDark 
+                            ? Colors.white.withOpacity(0.08) 
+                            : Colors.black.withOpacity(0.08),
+                        isDark 
+                            ? Colors.white.withOpacity(0.03) 
+                            : Colors.black.withOpacity(0.03),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: const Color(0xFF03A9F4).withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF03A9F4).withOpacity(0.1),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(25),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                       child: TabBar(
                         controller: _tabController,
                         indicator: BoxDecoration(
-                          borderRadius: BorderRadius.circular(25),
-                          color: isDark 
-                              ? Colors.white.withOpacity(0.1) 
-                              : Colors.black.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(22),
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF03A9F4).withOpacity(0.3),
+                              const Color(0xFF03A9F4).withOpacity(0.15),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF03A9F4).withOpacity(0.2),
+                              color: const Color(0xFF03A9F4).withOpacity(0.4),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, -1),
+                            ),
                           ],
                         ),
+                        indicatorPadding: const EdgeInsets.all(4),
                         dividerColor: Colors.transparent,
                         labelColor: isDark ? Colors.white : Colors.black,
                         unselectedLabelColor: isDark 
                             ? Colors.white.withOpacity(0.6) 
                             : Colors.black.withOpacity(0.6),
-                        tabs: const [
-                          Tab(text: 'Academic'),
-                          Tab(text: 'Non-Academic'),
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                        tabs: [
+                          Tab(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.school,
+                                    size: 18,
+                                    color: _tabController.index == 0
+                                        ? (isDark ? Colors.white : Colors.black)
+                                        : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6)),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text('Academic'),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Tab(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.emoji_events,
+                                    size: 18,
+                                    color: _tabController.index == 1
+                                        ? (isDark ? Colors.white : Colors.black)
+                                        : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6)),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text('Activities'),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -435,7 +533,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
           final rank = index + 1;
           final name = student.name;
           final subtitle = isAcademic
-              ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester > 0 ? student.currentSemester : 'N/A'}'
+              ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester > 0 ? _getOrdinalNumber(student.currentSemester) : 'N/A'}'
               : 'CC: ${student.cocurricularPoints} | EC: ${student.extracurricularPoints} | HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | Total: ${student.totalPoints + student.totalActivityPoints}';
                 
           return Padding(

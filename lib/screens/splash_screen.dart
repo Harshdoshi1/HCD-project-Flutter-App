@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'login_page.dart';
 import 'main_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/user_provider.dart';
+import '../models/user_model.dart';
+import 'package:provider/provider.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -103,10 +107,40 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     try {
       final prefs = await SharedPreferences.getInstance();
       final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+      final savedEmail = prefs.getString('saved_email');
+      final savedPassword = prefs.getString('saved_password');
+      final userDataString = prefs.getString('userData');
       
-      setState(() {
-        _isLoggedIn = isLoggedIn;
-      });
+      // Check if we have saved credentials and user data
+      if (isLoggedIn && savedEmail != null && savedPassword != null && userDataString != null) {
+        try {
+          // Parse and set user data in provider
+          final userData = json.decode(userDataString);
+          if (!mounted) return;
+          
+          // Set user data in provider
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          final user = User.fromJson(userData);
+          userProvider.setUser(user);
+          
+          setState(() {
+            _isLoggedIn = true;
+          });
+          
+          debugPrint('Auto-login successful with saved credentials');
+        } catch (e) {
+          debugPrint('Error parsing saved user data: $e');
+          // Clear corrupted data and go to login
+          await prefs.clear();
+          setState(() {
+            _isLoggedIn = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoggedIn = false;
+        });
+      }
       
       Future.delayed(const Duration(milliseconds: 3000), () {
         if (_isLoggedIn) {

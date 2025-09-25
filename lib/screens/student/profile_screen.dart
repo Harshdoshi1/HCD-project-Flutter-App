@@ -181,15 +181,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.notifications,
-            color: Colors.white,
-          ),
-          onPressed: () {
-            _showNotifications(context);
-          },
-        ),
         title: const Text(
           'My Profile',
           style: TextStyle(
@@ -744,119 +735,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
   }
 
-  void _showNotifications(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark 
-              ? Colors.black 
-              : Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Notifications',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white 
-                          : Colors.black,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildNotificationItem(
-                    'SE mid sem marks graded', 
-                    'Your score: 85/100', 
-                    Icons.assignment_turned_in,
-                    Colors.green,
-                  ),
-                  _buildNotificationItem(
-                    'OT mid sem marks graded', 
-                    'Your score: 78/100', 
-                    Icons.assignment_turned_in,
-                    Colors.blue,
-                  ),
-                  _buildNotificationItem(
-                    'CP club organized event on Saturday', 
-                    'Competitive Programming Contest at 10 AM', 
-                    Icons.event,
-                    Colors.orange,
-                  ),
-                  _buildNotificationItem(
-                    'New Hackathon is coming up', 
-                    'Register before April 25th', 
-                    Icons.code,
-                    Colors.purple,
-                  ),
-                  _buildNotificationItem(
-                    'AWT Assignment due tomorrow', 
-                    'Submit on the portal before midnight', 
-                    Icons.assignment_late,
-                    Colors.red,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationItem(String title, String subtitle, IconData icon, Color color) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: color.withOpacity(0.2),
-        child: Icon(icon, color: color),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isDark ? Colors.white : Colors.black87,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: isDark ? Colors.white70 : Colors.black54,
-        ),
-      ),
-      trailing: Text(
-        '${DateTime.now().difference(DateTime.now().subtract(const Duration(days: 2))).inDays}d ago',
-        style: TextStyle(
-          color: isDark ? Colors.white54 : Colors.black45,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
 
   void _showAboutDialog(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

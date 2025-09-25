@@ -61,6 +61,61 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _isLoadingBlooms = true;
   String? _selectedSubjectForBlooms;
   List<String> _availableSubjects = [];
+  late PageController _subjectPageController;
+  
+  // Helper method to convert number to ordinal
+  String _getOrdinalNumber(int number) {
+    if (number <= 0) return '${number}th';
+    
+    final lastDigit = number % 10;
+    final lastTwoDigits = number % 100;
+    
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+      return '${number}th';
+    }
+    
+    switch (lastDigit) {
+      case 1:
+        return '${number}st';
+      case 2:
+        return '${number}nd';
+      case 3:
+        return '${number}rd';
+      default:
+        return '${number}th';
+    }
+  }
+  
+  // Helper methods for subject navigation
+  void _previousSubject() {
+    if (_availableSubjects.isNotEmpty) {
+      final currentIndex = _availableSubjects.indexOf(_selectedSubjectForBlooms ?? '');
+      final newIndex = currentIndex > 0 ? currentIndex - 1 : _availableSubjects.length - 1;
+      setState(() {
+        _selectedSubjectForBlooms = _availableSubjects[newIndex];
+      });
+      _subjectPageController.animateToPage(
+        newIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+  
+  void _nextSubject() {
+    if (_availableSubjects.isNotEmpty) {
+      final currentIndex = _availableSubjects.indexOf(_selectedSubjectForBlooms ?? '');
+      final newIndex = (currentIndex + 1) % _availableSubjects.length;
+      setState(() {
+        _selectedSubjectForBlooms = _availableSubjects[newIndex];
+      });
+      _subjectPageController.animateToPage(
+        newIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
 
   void _switchGraph(String newGraph) {
     if (_activeGraph != newGraph) {
@@ -691,14 +746,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.5, 0),
+      begin: const Offset(0, 0.3),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _graphAnimationController,
-        curve: Curves.easeOutCubic,
+        curve: Curves.elasticOut,
       ),
     );
+    
+    // Initialize page controller for subject slider
+    _subjectPageController = PageController();
     
     // Define subject colors
     _subjectColors = [
@@ -723,6 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void dispose() {
     _graphAnimationController.dispose();
+    _subjectPageController.dispose();
     super.dispose();
   }
 
@@ -1006,57 +1065,144 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // Subject dropdown for Bloom's chart - always show for Bloom's chart
+                    // Subject slider with arrow navigation for Bloom's chart
                     if (title == 'Bloom\'s Taxonomy Analysis')
                       Container(
-                        constraints: const BoxConstraints(maxWidth: 120),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: _availableSubjects.isEmpty
-                              ? const Text(
-                                  'Loading...',
-                                  style: TextStyle(color: Colors.white, fontSize: 10),
-                                )
-                              : DropdownButton<String>(
-                                  value: _selectedSubjectForBlooms,
-                                  dropdownColor: Theme.of(context).cardColor,
-                                  style: const TextStyle(color: Colors.white, fontSize: 10),
-                                  icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 14),
-                                  isExpanded: true,
-                                  items: _availableSubjects.map((subject) {
-                                    return DropdownMenuItem<String>(
-                                      value: subject,
-                                      child: Text(
-                                        subject.length > 12 ? '${subject.substring(0, 12)}...' : subject,
-                                        style: TextStyle(
-                                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                                          fontSize: 10,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (String? newValue) {
-                                    if (newValue != null) {
-                                      setState(() {
-                                        _selectedSubjectForBlooms = newValue;
-                                      });
-                                    }
-                                  },
+                        constraints: const BoxConstraints(maxWidth: 250),
+                        height: 40,
+                        child: _availableSubjects.isEmpty
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1,
+                                  ),
                                 ),
-                        ),
+                                child: const Center(
+                                  child: Text(
+                                    'Loading...',
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                ),
+                              )
+                            : _availableSubjects.length == 1
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _availableSubjects.first.length > 18 
+                                            ? '${_availableSubjects.first.substring(0, 18)}...' 
+                                            : _availableSubjects.first,
+                                        style: const TextStyle(
+                                          color: Colors.white, 
+                                          fontSize: 12, 
+                                          fontWeight: FontWeight.w600
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Row(
+                                    children: [
+                                      // Left arrow
+                                      GestureDetector(
+                                        onTap: _previousSubject,
+                                        child: Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.chevron_left,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Subject slider
+                                      Expanded(
+                                        child: Container(
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: PageView.builder(
+                                            controller: _subjectPageController,
+                                            onPageChanged: (index) {
+                                              setState(() {
+                                                _selectedSubjectForBlooms = _availableSubjects[index];
+                                              });
+                                            },
+                                            itemCount: _availableSubjects.length,
+                                            itemBuilder: (context, index) {
+                                              final subject = _availableSubjects[index];
+                                              return Center(
+                                                child: Text(
+                                                  subject.length > 15 
+                                                      ? '${subject.substring(0, 15)}...' 
+                                                      : subject,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Right arrow
+                                      GestureDetector(
+                                        onTap: _nextSubject,
+                                        child: Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.chevron_right,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                       ),
                   ],
                 ),
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Expanded(child: chart),
               ],
             ),
@@ -2028,25 +2174,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     
     return Container(
       width: double.infinity,
-      height: 230, // Adjusted overall height to fix overflow
+      height: 250, // Adjusted overall height to fix overflow
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Chart title
-          Text(
-            'Activity Points Distribution',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Theme.of(context).textTheme.titleMedium?.color,
-            ),
-          ),
-          const SizedBox(height: 8),
           
           // Animated pie chart
           SizedBox(
-            height: 120,
+            height: 130,
             child: Center(
               child: SizedBox(
                 width: 200, // Limited width for pie chart
@@ -2525,7 +2661,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               Padding(
                 padding: const EdgeInsets.only(top: 4.0),
                 child: Text(
-                  'Semester $_currentSemesterNumber Subject Performance',
+                  '${_getOrdinalNumber(_currentSemesterNumber)} Semester Subject Performance',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

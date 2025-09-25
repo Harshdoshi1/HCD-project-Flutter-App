@@ -36,8 +36,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    // Load local testing mode preference
+    // Load local testing mode preference and saved credentials
     _loadLocalTestingModePreference();
+    _loadSavedCredentials();
     
     _animationController = AnimationController(
       vsync: this,
@@ -77,6 +78,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     // Also update the API config
     await ApiConfig.setUseLocalMockData(value);
   }
+  
+  // Load saved credentials from SharedPreferences
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('saved_email');
+    final savedPassword = prefs.getString('saved_password');
+    final savedRole = prefs.getString('saved_role');
+    
+    if (savedEmail != null && savedPassword != null) {
+      setState(() {
+        _emailController.text = savedEmail;
+        _passwordController.text = savedPassword;
+        if (savedRole != null) {
+          _selectedRole = savedRole;
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -90,6 +109,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     if (_formKey.currentState!.validate()) {
       // Save the current local testing mode setting
       await _saveLocalTestingModePreference(_useLocalTestingMode);
+      
+      // Save login credentials for auto-login
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_email', _emailController.text);
+      await prefs.setString('saved_password', _passwordController.text);
+      await prefs.setString('saved_role', _selectedRole);
       
       setState(() {
         _isLoading = true;
@@ -499,31 +524,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           ),
           const SizedBox(height: 8),
           
-          // Local Testing Mode Toggle
-          Row(
-            children: [
-              Switch(
-                value: _useLocalTestingMode,
-                onChanged: (value) {
-                  setState(() {
-                    _useLocalTestingMode = value;
-                  });
-                },
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Local Testing Mode (No backend required)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           
           // Login Button
           SizedBox(

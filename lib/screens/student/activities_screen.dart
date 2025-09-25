@@ -344,33 +344,18 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
           SafeArea(
             child: Column(
               children: [
-                // App bar with back button
+                // App bar without back button
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_back,
-                          color: isDark ? Colors.white : Colors.black,
-                        ),
-                        onPressed: () => Navigator.pop(context),
+                  child: Center(
+                    child: Text(
+                      'My Activities',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            'My Activities',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Empty container to balance the back button for perfect centering
-                      const SizedBox(width: 48),
-                    ],
+                    ),
                   ),
                 ),
 
