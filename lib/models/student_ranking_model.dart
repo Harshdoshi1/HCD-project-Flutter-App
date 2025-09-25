@@ -41,13 +41,15 @@ class StudentRanking {
       enrollmentNumber: json['enrollmentNumber'] ?? '',
       hardwarePoints: json['hardwarePoints'] ?? 0,
       softwarePoints: json['softwarePoints'] ?? 0,
-      cocurricularPoints: json['totalCocurricular'] ?? 0,
-      extracurricularPoints: json['totalExtracurricular'] ?? 0,
-      cpi: json['cpi'] != null ? double.tryParse(json['cpi'].toString()) : null,
-      spi: json['spi'] != null ? double.tryParse(json['spi'].toString()) : null,
-      rank: json['rank'],
+      cocurricularPoints: json['totalCocurricular'] ?? json['cocurricularPoints'] ?? 0,
+      extracurricularPoints: json['totalExtracurricular'] ?? json['extracurricularPoints'] ?? 0,
+      cpi: json['cpi'] != null ? double.tryParse(json['cpi'].toString()) : 
+           json['CPI'] != null ? double.tryParse(json['CPI'].toString()) : null,
+      spi: json['spi'] != null ? double.tryParse(json['spi'].toString()) : 
+           json['SPI'] != null ? double.tryParse(json['SPI'].toString()) : null,
+      rank: json['rank'] ?? json['Rank'],
       batch: json['batch'],
-      currentSemester: json['currnetsemester'] ?? json['currentSemester'] ?? json['semester'] ?? 0,
+      currentSemester: json['currnetsemester'] ?? json['currentSemester'] ?? json['semester'] ?? json['SemesterId'] ?? 0,
     );
   }
 }

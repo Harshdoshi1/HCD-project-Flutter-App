@@ -705,7 +705,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                   children: [
                     Expanded(
                       child: Text(
-                        activity['eventName'] ?? 'Unknown Event',
+                        activity['eventName'] ?? activity['Event_Name'] ?? activity['name'] ?? 'Unknown Event',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -722,11 +722,11 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        activity['eventType'] == 'co-curricular' 
-                            ? 'CC: ${activity['totalCocurricular']}' 
-                            : 'EC: ${activity['totalExtracurricular']}',
+                        (activity['eventType'] ?? activity['Event_Type']) == 'co-curricular' 
+                            ? 'CC: ${activity['totalCocurricular'] ?? activity['Total_Cocurricular'] ?? 0}' 
+                            : 'EC: ${activity['totalExtracurricular'] ?? activity['Total_Extracurricular'] ?? 0}',
                         style: TextStyle(
-                          color: activity['eventType'] == 'co-curricular'
+                          color: (activity['eventType'] ?? activity['Event_Type']) == 'co-curricular'
                               ? Colors.blue
                               : Colors.green,
                           fontWeight: FontWeight.bold,
@@ -737,7 +737,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Participation: ${activity['participationType'] ?? 'General'}',
+                  'Participation: ${activity['participationType'] ?? activity['Participation_Type'] ?? 'General'}',
                   style: TextStyle(
                     color: isDark 
                         ? Colors.white.withOpacity(0.7) 
@@ -755,7 +755,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Date: ${activity['eventDate'] != null ? _formatDate(activity['eventDate']) : 'N/A'}',
+                  'Date: ${(activity['eventDate'] ?? activity['Event_Date']) != null ? _formatDate(activity['eventDate'] ?? activity['Event_Date']) : 'N/A'}',
                   style: TextStyle(
                     color: isDark 
                         ? Colors.white.withOpacity(0.7) 

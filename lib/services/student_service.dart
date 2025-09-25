@@ -217,7 +217,7 @@ class StudentService {
     }
   }
 
-  // Get all students for rankings
+  // Get all students for rankings with academic data
   Future<List<dynamic>> getAllStudents() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -237,7 +237,35 @@ class StudentService {
       );
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final students = json.decode(response.body) as List<dynamic>;
+        
+        // Fetch academic data for each student
+        final enrichedStudents = <Map<String, dynamic>>[];
+        
+        for (var student in students) {
+          final studentMap = Map<String, dynamic>.from(student);
+          final email = studentMap['email'];
+          
+          if (email != null && email.toString().isNotEmpty) {
+            try {
+              // Get academic data for this student
+              final academicData = await getStudentAcademicDataByEmail(email);
+              if (academicData['cpiData'] != null) {
+                studentMap['cpi'] = academicData['cpiData']['latestCPI'];
+                studentMap['spi'] = academicData['cpiData']['latestSPI'];
+                studentMap['rank'] = academicData['cpiData']['rank'];
+                studentMap['currentSemester'] = academicData['cpiData']['semesterNumber'];
+              }
+            } catch (e) {
+              print('Error fetching academic data for student $email: $e');
+              // Keep student data without academic info
+            }
+          }
+          
+          enrichedStudents.add(studentMap);
+        }
+        
+        return enrichedStudents;
       } else {
         print('Failed to get all students: ${response.body}, returning empty list');
         return [];
@@ -289,14 +317,27 @@ class StudentService {
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
             
-            // Calculate totals
+            // Calculate totals and collect event details
             int totalCocurricular = 0;
             int totalExtracurricular = 0;
+            List<Map<String, dynamic>> eventDetails = [];
             
             if (data is List) {
               for (var activity in data) {
                 totalCocurricular += int.parse(activity['totalCocurricular']?.toString() ?? '0');
                 totalExtracurricular += int.parse(activity['totalExtracurricular']?.toString() ?? '0');
+                
+                // Collect event details with proper names
+                eventDetails.add({
+                  'eventId': activity['eventId'],
+                  'eventName': activity['eventName'] ?? activity['Event_Name'] ?? 'Unknown Event',
+                  'eventType': activity['eventType'] ?? activity['Event_Type'] ?? 'unknown',
+                  'eventDate': activity['eventDate'] ?? activity['Event_Date'],
+                  'participationType': activity['participationType'] ?? activity['Participation_Type'] ?? 'Participant',
+                  'cocurricularPoints': int.parse(activity['totalCocurricular']?.toString() ?? '0'),
+                  'extracurricularPoints': int.parse(activity['totalExtracurricular']?.toString() ?? '0'),
+                  'semester': activity['semester'] ?? semester,
+                });
               }
             } else if (data is Map && data.containsKey('totalCocurricular')) {
               totalCocurricular = int.parse(data['totalCocurricular']?.toString() ?? '0');
@@ -312,6 +353,7 @@ class StudentService {
               'semester': semester,
               'totalCocurricular': totalCocurricular,
               'totalExtracurricular': totalExtracurricular,
+              'eventDetails': eventDetails,
               'activityData': data
             });
           }

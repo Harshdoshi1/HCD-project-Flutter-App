@@ -506,6 +506,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // Helper method to calculate grid interval for Y-axis
+  double _calculateGridInterval(double maxMarks) {
+    if (maxMarks <= 20) {
+      return 5.0;
+    } else if (maxMarks <= 50) {
+      return 10.0;
+    } else if (maxMarks <= 100) {
+      return 20.0;
+    } else {
+      return (maxMarks / 5).ceilToDouble();
+    }
+  }
+
   // Load Bloom's taxonomy data
   Future<void> _loadBloomsData() async {
     try {
@@ -2748,10 +2761,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       duration: const Duration(milliseconds: 1200),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
+        // Calculate max marks for Y-axis
+        double maxMarks = 100.0; // Default fallback
+        if (selectedSubjectData.bloomsLevels.isNotEmpty) {
+          final marksList = selectedSubjectData.bloomsLevels
+              .map((level) => level.marks ?? 0.0)
+              .where((marks) => marks > 0)
+              .toList();
+          
+          if (marksList.isNotEmpty) {
+            maxMarks = marksList.reduce((a, b) => a > b ? a : b);
+            // Add some padding to max value
+            maxMarks = (maxMarks * 1.1).ceilToDouble();
+          }
+        }
+        
         return BarChart(
           BarChartData(
             alignment: BarChartAlignment.spaceAround,
-            maxY: 100,
+            maxY: maxMarks,
             minY: 0,
             barTouchData: BarTouchData(
               enabled: true,
@@ -2761,12 +2789,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 tooltipMargin: 8,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
                   final bloomLevel = selectedSubjectData.bloomsLevels[groupIndex];
+                  final marks = bloomLevel.marks ?? 0.0;
+                  final score = bloomLevel.score ?? 0;
                   return BarTooltipItem(
-                    '${bloomLevel.level}\n${bloomLevel.score}%\n(${bloomLevel.obtained.toStringAsFixed(1)}/${bloomLevel.possible.toStringAsFixed(1)})',
+                    '${bloomLevel.level}\n${marks.toStringAsFixed(1)} marks\n($score%)',
                     const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   );
                 },
@@ -2780,14 +2810,38 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   getTitlesWidget: (value, meta) {
                     if (value >= 0 && value < selectedSubjectData.bloomsLevels.length) {
                       final level = selectedSubjectData.bloomsLevels[value.toInt()].level;
+                      // Create shorter labels to prevent collision
+                      String shortLabel = '';
+                      switch (level.toLowerCase()) {
+                        case 'remember':
+                          shortLabel = 'Rem';
+                          break;
+                        case 'understand':
+                          shortLabel = 'Und';
+                          break;
+                        case 'apply':
+                          shortLabel = 'App';
+                          break;
+                        case 'analyze':
+                          shortLabel = 'Ana';
+                          break;
+                        case 'evaluate':
+                          shortLabel = 'Eva';
+                          break;
+                        case 'create':
+                          shortLabel = 'Cre';
+                          break;
+                        default:
+                          shortLabel = level.length > 3 ? level.substring(0, 3) : level;
+                      }
                       return Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
-                          level.length > 8 ? level.substring(0, 8) : level,
+                          shortLabel,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 10,
+                            fontSize: 9,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -2801,19 +2855,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
+                  interval: _calculateGridInterval(maxMarks),
                   getTitlesWidget: (value, meta) {
-                    if (value % 20 == 0) {
-                      return Text(
-                        '${value.toInt()}%',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
+                    // Show labels at regular intervals
+                    double interval = _calculateGridInterval(maxMarks);
+                    if (value % interval == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: Text(
+                          '${value.toInt()}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       );
                     }
                     return const SizedBox();
                   },
-                  reservedSize: 35,
+                  reservedSize: 40,
                 ),
               ),
               topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -2822,7 +2883,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             borderData: FlBorderData(show: false),
             gridData: FlGridData(
               show: true,
-              horizontalInterval: 20,
+              horizontalInterval: _calculateGridInterval(maxMarks),
               getDrawingHorizontalLine: (value) {
                 return FlLine(
                   color: Colors.white.withOpacity(0.1),
@@ -2845,13 +2906,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 x: index,
                 barRods: [
                   BarChartRodData(
-                    toY: bloomLevel.score.toDouble() * value,
+                    toY: (bloomLevel.marks ?? 0.0) * value,
                     color: colors[index % colors.length],
                     width: 20,
                     borderRadius: BorderRadius.circular(4),
                     backDrawRodData: BackgroundBarChartRodData(
                       show: true,
-                      toY: 100,
+                      toY: maxMarks,
                       color: Colors.white.withOpacity(0.1),
                     ),
                   ),

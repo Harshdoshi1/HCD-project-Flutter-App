@@ -435,8 +435,8 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
           final rank = index + 1;
           final name = student.name;
           final subtitle = isAcademic
-              ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester}'
-              : 'Total CC: ${student.cocurricularPoints} | Total EC: ${student.extracurricularPoints} | HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | Total: ${student.totalPoints + student.totalActivityPoints}';
+              ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester > 0 ? student.currentSemester : 'N/A'}'
+              : 'CC: ${student.cocurricularPoints} | EC: ${student.extracurricularPoints} | HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | Total: ${student.totalPoints + student.totalActivityPoints}';
                 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),

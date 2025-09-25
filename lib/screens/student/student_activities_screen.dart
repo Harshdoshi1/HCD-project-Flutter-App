@@ -126,11 +126,11 @@ class _StudentActivitiesScreenState extends State<StudentActivitiesScreen> {
       
       _semesterTotals[semester]!['cocurricular'] = 
         _semesterTotals[semester]!['cocurricular']! + 
-        (int.tryParse(activity['totalCocurricular']?.toString() ?? '0') ?? 0);
+        (int.tryParse(activity['totalCocurricular']?.toString() ?? activity['Total_Cocurricular']?.toString() ?? '0') ?? 0);
         
       _semesterTotals[semester]!['extracurricular'] = 
         _semesterTotals[semester]!['extracurricular']! + 
-        (int.tryParse(activity['totalExtracurricular']?.toString() ?? '0') ?? 0);
+        (int.tryParse(activity['totalExtracurricular']?.toString() ?? activity['Total_Extracurricular']?.toString() ?? '0') ?? 0);
     }
   }
 
@@ -369,11 +369,11 @@ class _StudentActivitiesScreenState extends State<StudentActivitiesScreen> {
                   
                   // Activities for this semester
                   ...semesterActivities.map((activity) {
-                    final eventName = activity['eventName'] ?? 'Unknown Event';
-                    final eventDate = activity['eventDate'] ?? 'Unknown Date';
-                    final cocurricular = int.tryParse(activity['totalCocurricular']?.toString() ?? '0') ?? 0;
-                    final extracurricular = int.tryParse(activity['totalExtracurricular']?.toString() ?? '0') ?? 0;
-                    final participationType = activity['participationType'] ?? 'Unknown';
+                    final eventName = activity['eventName'] ?? activity['Event_Name'] ?? activity['name'] ?? 'Unknown Event';
+                    final eventDate = activity['eventDate'] ?? activity['Event_Date'] ?? 'Unknown Date';
+                    final cocurricular = int.tryParse(activity['totalCocurricular']?.toString() ?? activity['Total_Cocurricular']?.toString() ?? '0') ?? 0;
+                    final extracurricular = int.tryParse(activity['totalExtracurricular']?.toString() ?? activity['Total_Extracurricular']?.toString() ?? '0') ?? 0;
+                    final participationType = activity['participationType'] ?? activity['Participation_Type'] ?? 'Unknown';
                     
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),

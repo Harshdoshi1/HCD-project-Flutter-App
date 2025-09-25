@@ -45,12 +45,14 @@ class SubjectBloomsData {
 class BloomsLevel {
   final String level;
   final int score;
+  final double marks;
   final double obtained;
   final double possible;
 
   BloomsLevel({
     required this.level,
     required this.score,
+    required this.marks,
     required this.obtained,
     required this.possible,
   });
@@ -59,8 +61,9 @@ class BloomsLevel {
     return BloomsLevel(
       level: json['level'] ?? '',
       score: json['score'] ?? 0,
-      obtained: (json['obtained'] ?? 0).toDouble(),
-      possible: (json['possible'] ?? 0).toDouble(),
+      marks: (json['marks'] ?? 0.0).toDouble(),
+      obtained: (json['obtained'] ?? 0.0).toDouble(),
+      possible: (json['possible'] ?? 0.0).toDouble(),
     );
   }
 }
