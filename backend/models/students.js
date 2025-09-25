@@ -33,6 +33,21 @@ const Student = sequelize.define('Student', {
         type: DataTypes.STRING,
         allowNull: true,
         comment: 'Current class name (e.g., Computer Science A, Computer Science B)'
+    },
+    profileImage: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'URL to the student profile image'
+    },
+    phone: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Student phone number'
+    },
+    bio: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Student bio/description'
     }
 }, {
     tableName: 'Students',

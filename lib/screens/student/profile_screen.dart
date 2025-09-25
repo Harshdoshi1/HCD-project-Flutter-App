@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +11,8 @@ import '../../providers/user_provider.dart';
 import '../../models/user_model.dart';
 import '../../services/academic_service.dart';
 import '../../services/student_service.dart';
+import '../../services/profile_service.dart';
 import '../splash_screen.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -29,11 +31,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late Animation<double> _fadeAnimation;
   User? _currentUser;
   File? _profileImage;
+  String? _profileImageUrl;
   AcademicData? _academicData;
   String? _academicError;
   
   // Student data
   final StudentService _studentService = StudentService();
+  final ProfileService _profileService = ProfileService();
   Map<String, dynamic>? _studentCPIData;
   bool _isLoadingStudentData = false;
   String? _studentDataError;
@@ -455,15 +459,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return Column(
       children: [
         GestureDetector(
-          onTap: _isEditing ? _changeProfilePicture : null,
+          onTap: _isEditing ? _pickImage : null,
+          onLongPress: _isEditing && (_profileImage != null || _profileImageUrl != null) ? _deleteProfileImage : null,
           child: Stack(
             alignment: Alignment.bottomRight,
             children: [
               CircleAvatar(
                 radius: 60,
                 backgroundColor: isDark ? Colors.grey[800] : Colors.white,
-                backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                child: _profileImage == null
+                backgroundImage: _profileImage != null 
+                    ? FileImage(_profileImage!) 
+                    : _profileImageUrl != null 
+                        ? NetworkImage(_profileImageUrl!) 
+                        : null,
+                child: _profileImage == null && _profileImageUrl == null
                     ? Icon(
                         Icons.person,
                         size: 60,
@@ -510,40 +519,118 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Future<void> _changeProfilePicture() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _profileImage = File(image.path);
-      });
-      // Save the profile image path
-      await _saveProfileImagePath(image.path);
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null && _currentUser?.email != null) {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        dynamic imageData;
+        if (kIsWeb) {
+          // For web: get bytes directly
+          imageData = await image.readAsBytes();
+        } else {
+          // For mobile: use File
+          imageData = File(image.path);
+        }
+
+        // Upload image to database
+        final result = await _profileService.uploadProfileImage(
+          _currentUser!.email,
+          imageData,
+        );
+
+        Navigator.pop(context); // Close loading dialog
+
+        if (result['imageUrl'] != null) {
+          setState(() {
+            if (!kIsWeb) {
+              _profileImage = File(image.path);
+            }
+            _profileImageUrl = result['imageUrl'];
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile image updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          throw Exception('Upload failed');
+        }
+      }
+    } catch (e) {
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop(); // Close loading dialog if open
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _loadProfileImage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final imagePath = prefs.getString('profile_image_path');
-      if (imagePath != null && !kIsWeb) {
-        final file = File(imagePath);
-        if (await file.exists()) {
-          setState(() {
-            _profileImage = file;
-          });
-        }
+      if (_currentUser?.email != null) {
+        final imageUrl = await _profileService.getProfileImageUrl(_currentUser!.email);
+        setState(() {
+          _profileImageUrl = imageUrl;
+        });
       }
     } catch (e) {
       debugPrint('Error loading profile image: $e');
     }
   }
 
-  Future<void> _saveProfileImagePath(String path) async {
+  Future<void> _deleteProfileImage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('profile_image_path', path);
+      if (_currentUser?.email != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        final success = await _profileService.deleteProfileImage(_currentUser!.email);
+        Navigator.pop(context); // Close loading dialog
+
+        if (success) {
+          setState(() {
+            _profileImage = null;
+            _profileImageUrl = null;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile image deleted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          throw Exception('Delete failed');
+        }
+      }
     } catch (e) {
-      debugPrint('Error saving profile image path: $e');
+      Navigator.of(context).pop(); // Close loading dialog if open
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

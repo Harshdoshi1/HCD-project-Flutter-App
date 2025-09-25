@@ -28,6 +28,8 @@ const classSectionRoutes = require('./routes/classSection_routes');
 const studentMarksRoutes = require('./routes/studentMarks_routes');
 const studentAnalysisRoutes = require('./routes/studentAnalysis_routes');
 const bloomsAnalysisRoutes = require('./routes/bloomsAnalysis_routes');
+const profileRoutes = require('./routes/profile_routes');
+const path = require('path');
 const app = express();
 
 // Enable CORS
@@ -44,6 +46,9 @@ app.use(express.urlencoded({ extended: true }));
 // Increase payload size limit for file uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Serve static files for profile images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api', mainRouter);
@@ -78,6 +83,7 @@ app.use('/api/course-outcomes', courseOutcomeRoutes);
 app.use('/api/student-marks', studentMarksRoutes);
 app.use('/api/student-analysis', studentAnalysisRoutes);
 app.use('/api/blooms-analysis', bloomsAnalysisRoutes);
+app.use('/api/profile', profileRoutes);
 
 
 app.get("/api/marks/students/:batchId", gettedmarksController.getStudentMarksByBatchAndSubject);

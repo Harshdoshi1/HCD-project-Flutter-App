@@ -7,12 +7,12 @@ import '../../utils/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'dart:ui';
-import 'dart:io';
 import 'dart:convert';
 import '../../providers/user_provider.dart';
 import '../../services/academic_service.dart';
 import '../../services/student_service.dart';
 import '../../services/student_analysis_service.dart';
+import '../../services/profile_service.dart';
 import '../../models/blooms_taxonomy_model.dart';
 import 'profile_screen.dart';
 import '../../constants/app_theme.dart';
@@ -34,6 +34,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   List<dynamic> _activities = [];
   String? _enrollmentNumber;  
   final AcademicService _academicService = AcademicService();
+  final ProfileService _profileService = ProfileService();
+  String? _profileImageUrl;
   List<SemesterSPI>? _spiData;
   List<Map<String, dynamic>> _semesterSPIData = [];
   bool _isLoadingSemesterSPI = true;
@@ -725,6 +727,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // Load profile image from database
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail');
+      
+      if (userEmail != null && userEmail.isNotEmpty) {
+        final imageUrl = await _profileService.getProfileImageUrl(userEmail);
+        if (mounted) {
+          setState(() {
+            _profileImageUrl = imageUrl;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+      if (mounted) {
+        setState(() {
+          _profileImageUrl = null;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -769,11 +795,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Start animation
     _graphAnimationController.forward();
     
-    // Load user data, SPI data, activity points and blooms data
+    // Load user data, SPI data, activity points, blooms data and profile image
     _loadUserData();
     _loadSPIData();
     _loadActivityPoints();
     _loadBloomsData();
+    _loadProfileImage();
     
     // Set random daily quote
     _dailyQuote = _dailyQuotes[DateTime.now().day % _dailyQuotes.length];
@@ -876,34 +903,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               ),
                             ],
                           ),
-                          child: FutureBuilder<SharedPreferences>(
-                            future: SharedPreferences.getInstance(),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null) {
-                                final prefs = snapshot.data!;
-                                final userEmail = prefs.getString('userEmail') ?? '';
-                                final imagePath = prefs.getString('${userEmail}_profileImage');
-                                
-                                if (imagePath != null && imagePath.isNotEmpty) {
-                                  final file = File(imagePath);
-                                  return CircleAvatar(
-                                    radius: 24,
-                                    backgroundImage: FileImage(file),
-                                  );
-                                }
-                              }
-                              
-                              return CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
-                                child: Icon(
-                                  Icons.person,
-                                  color: Theme.of(context).textTheme.bodyLarge!.color,
-                                  size: 32,
+                          child: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                              ? CircleAvatar(
+                                  radius: 24,
+                                  backgroundImage: NetworkImage(_profileImageUrl!),
+                                  onBackgroundImageError: (exception, stackTrace) {
+                                    print('Error loading profile image: $exception');
+                                  },
+                                )
+                              : CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                                  child: Icon(
+                                    Icons.person,
+                                    color: Theme.of(context).textTheme.bodyLarge!.color,
+                                    size: 32,
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
                         ),
                       ),
                     ],
@@ -1057,10 +1073,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1074,17 +1090,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             ? Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
+                                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                     width: 1,
                                   ),
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Text(
                                     'Loading...',
-                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                    style: TextStyle(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, 
+                                      fontSize: 12
+                                    ),
                                   ),
                                 ),
                               )
@@ -1092,10 +1111,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.15),
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.3),
+                                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                         width: 1,
                                       ),
                                     ),
@@ -1104,8 +1123,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                         _availableSubjects.first.length > 18 
                                             ? '${_availableSubjects.first.substring(0, 18)}...' 
                                             : _availableSubjects.first,
-                                        style: const TextStyle(
-                                          color: Colors.white, 
+                                        style: TextStyle(
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, 
                                           fontSize: 12, 
                                           fontWeight: FontWeight.w600
                                         ),
@@ -1121,16 +1140,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.15),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(16),
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(0.3),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                               width: 1,
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.chevron_left,
-                                            color: Colors.white,
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                             size: 20,
                                           ),
                                         ),
@@ -1141,10 +1160,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                         child: Container(
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.1),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                                             borderRadius: BorderRadius.circular(16),
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(0.3),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                               width: 1,
                                             ),
                                           ),
@@ -1163,8 +1182,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                                   subject.length > 15 
                                                       ? '${subject.substring(0, 15)}...' 
                                                       : subject,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
+                                                  style: TextStyle(
+                                                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w600,
                                                   ),
@@ -1183,16 +1202,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.15),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(16),
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(0.3),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                               width: 1,
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.chevron_right,
-                                            color: Colors.white,
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                             size: 20,
                                           ),
                                         ),
