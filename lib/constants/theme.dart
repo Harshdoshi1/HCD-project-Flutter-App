@@ -6,7 +6,7 @@ class AppTheme {
   
   static ThemeData get theme => ThemeData.light().copyWith(
     primaryColor: primaryColor,
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: primaryColor,
     ),
   );

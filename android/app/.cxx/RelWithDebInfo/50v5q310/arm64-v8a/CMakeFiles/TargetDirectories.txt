@@ -1,0 +1,2 @@
+C:/Users/dell/sem6/hcd_proj/flutter_hcd/HCD-project-Flutter-main-rishit/android/app/.cxx/RelWithDebInfo/50v5q310/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/dell/sem6/hcd_proj/flutter_hcd/HCD-project-Flutter-main-rishit/android/app/.cxx/RelWithDebInfo/50v5q310/arm64-v8a/CMakeFiles/rebuild_cache.dir

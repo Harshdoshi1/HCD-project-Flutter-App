@@ -42,11 +42,9 @@ class AppTheme {
           primaryContainer: primaryColorLight,
           secondary: secondaryColor,
           secondaryContainer: secondaryColorLight,
-          background: Colors.white,
           surface: Colors.white,
           onPrimary: onPrimaryColor,
           onSecondary: onSecondaryColor,
-          onBackground: onBackgroundColor,
           onSurface: onSurfaceColor,
           error: errorColor,
           
@@ -72,11 +70,9 @@ class AppTheme {
           primary: darkPrimaryColor,
           primaryContainer: darkPrimaryColorLight,
           secondary: darkSecondaryColor,
-          background: Color.fromARGB(255, 0, 0, 0),
           surface: Color.fromARGB(255, 0, 0, 0),
           onPrimary: darkOnPrimaryColor,
           onSecondary: darkOnSecondaryColor,
-          onBackground: darkOnBackgroundColor,
           onSurface: darkOnSurfaceColor,
           error: darkErrorColor,
 
@@ -86,7 +82,7 @@ class AppTheme {
         textTheme: _textTheme(Colors.white), 
         buttonTheme: _buttonTheme(darkPrimaryColor),
         inputDecorationTheme: _inputDecorationTheme(darkSurfaceColor, darkOnSurfaceColor),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: darkPrimaryColor,
           foregroundColor: darkOnPrimaryColor,
         ),
@@ -106,7 +102,7 @@ class AppTheme {
       );
 
   // Card Theme
-  static CardTheme _cardTheme(Color cardColor) => CardTheme(
+  static CardThemeData _cardTheme(Color cardColor) => CardThemeData(
         color: cardColor,
         elevation: 2,
         shape: RoundedRectangleBorder(

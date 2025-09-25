@@ -14,13 +14,13 @@ class Subject {
   });
 
   double get totalMarks => components.values.fold(
-        0, 
-        (sum, component) => sum + (component['marks'] ?? 0)
+        0.0, 
+        (sum, component) => sum + ((component['marks'] ?? 0).toDouble())
       );
 
   double get maxMarks => components.values.fold(
-        0, 
-        (sum, component) => sum + (component['outOf'] ?? 0)
+        0.0, 
+        (sum, component) => sum + ((component['outOf'] ?? 0).toDouble())
       );
 
   double get percentage => maxMarks > 0 ? (totalMarks / maxMarks) * 100 : 0;

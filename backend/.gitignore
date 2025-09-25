@@ -1,0 +1,18 @@
+
+
+node_modules
+.env
+# Documentation (ignore these markdowns if you don’t want them on GitHub)
+backend/README_EVENT_OUTCOMES.md
+backend/README_EXCEL_UPLOAD.md
+backend/TROUBLESHOOTING.md
+
+# Environment template (never commit real secrets)
+backend/env-template.txt
+
+# Local test/debug scripts
+backend/test-api-endpoints.js
+backend/test-db-connection.js
+backend/test-event-outcomes.js
+backend/test-excel-upload.js
+backend/test-simple.js
