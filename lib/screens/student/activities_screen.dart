@@ -348,18 +348,17 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.arrow_back,
-                              color: isDark ? Colors.white : Colors.black,
-                            ),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          Text(
+                      IconButton(
+                        icon: Icon(
+                          Icons.arrow_back,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
                             'My Activities',
                             style: TextStyle(
                               color: isDark ? Colors.white : Colors.black,
@@ -367,15 +366,10 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          isDark ? Icons.wb_sunny : Icons.nightlight_round,
-                          color: isDark ? Colors.white : Colors.black,
                         ),
-                        onPressed: widget.toggleTheme,
                       ),
+                      // Empty container to balance the back button for perfect centering
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
@@ -575,48 +569,6 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                   ),
                 ),
 
-                // Tab bar
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  height: 45,
-                  decoration: BoxDecoration(
-                    color: isDark 
-                        ? Colors.white.withOpacity(0.05) 
-                        : Colors.black.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: TabBar(
-                        controller: _tabController,
-                        indicator: BoxDecoration(
-                          borderRadius: BorderRadius.circular(25),
-                          color: isDark 
-                              ? Colors.white.withOpacity(0.1) 
-                              : Colors.black.withOpacity(0.1),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF03A9F4).withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        dividerColor: Colors.transparent,
-                        labelColor: isDark ? Colors.white : Colors.black,
-                        unselectedLabelColor: isDark 
-                            ? Colors.white.withOpacity(0.6) 
-                            : Colors.black.withOpacity(0.6),
-                        tabs: const [
-                          Tab(text: 'Co-Curricular'),
-                          Tab(text: 'Extra-Curricular'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 
                 // Content
                 Expanded(
@@ -624,13 +576,9 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                       ? const Center(child: CircularProgressIndicator())
                       : _error != null
                           ? _buildErrorWidget()
-                          : TabBarView(
-                              controller: _tabController,
-                              children: [
-                                _buildActivityList(_coCurricularActivities, "Co-Curricular"),
-                                _buildActivityList(_extraCurricularActivities, "Extra-Curricular"),
-                              ],
-                            ),
+                          : _selectedTabIndex == 0
+                              ? _buildActivityList(_coCurricularActivities, "Co-Curricular")
+                              : _buildActivityList(_extraCurricularActivities, "Extra-Curricular"),
                 ),
               ],
             ),
