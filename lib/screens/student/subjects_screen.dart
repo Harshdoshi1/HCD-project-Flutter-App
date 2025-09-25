@@ -35,6 +35,15 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   bool _useNewApi = true; // Flag to switch between old and new API
   String? _error;
 
+  // Pull-to-refresh handler
+  Future<void> _onRefresh() async {
+    try {
+      await _fetchStudentData();
+    } catch (e) {
+      debugPrint('Subjects refresh failed: $e');
+    }
+  }
+
   static const List<Map<String, dynamic>> semesters = [
     {
       'name': 'Semester 1',
@@ -366,28 +375,47 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               ),
               // Subject list
               Expanded(
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _isLoading 
-                    ? _buildLoadingIndicator()
-                    : _error != null
-                    ? _buildErrorMessage()
-                    : _performanceData != null
-                    ? _buildPerformanceSubjectsList()
-                    : _studentData == null || _studentData!.semesters.isEmpty
-                    ? _buildNoDataMessage()
-                    : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _selectedSemester <= _studentData!.semesters.length
-                        ? _getSubjectsForSelectedSemester().length
-                        : 0,
-                      itemBuilder: (context, index) {
-                        if (_selectedSemester > _studentData!.semesters.length) return const SizedBox();
-                        final subject = _getSubjectsForSelectedSemester()[index];
-                        return _buildSubjectCardFromApiData(subject, context);
-                      },
+                child: RefreshIndicator(
+                  onRefresh: _onRefresh,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: _isLoading 
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                _buildLoadingIndicator(),
+                              ],
+                            )
+                          : _error != null
+                              ? ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    _buildErrorMessage(),
+                                  ],
+                                )
+                              : _performanceData != null
+                                  ? _buildPerformanceSubjectsList()
+                                  : (_studentData == null || _studentData!.semesters.isEmpty)
+                                      ? ListView(
+                                          physics: const AlwaysScrollableScrollPhysics(),
+                                          children: [
+                                            _buildNoDataMessage(),
+                                          ],
+                                        )
+                                      : ListView.builder(
+                                          physics: const AlwaysScrollableScrollPhysics(),
+                                          padding: const EdgeInsets.all(16),
+                                          itemCount: _selectedSemester <= _studentData!.semesters.length
+                                              ? _getSubjectsForSelectedSemester().length
+                                              : 0,
+                                          itemBuilder: (context, index) {
+                                            if (_selectedSemester > _studentData!.semesters.length) return const SizedBox();
+                                            final subject = _getSubjectsForSelectedSemester()[index];
+                                            return _buildSubjectCardFromApiData(subject, context);
+                                          },
+                                        ),
                     ),
                   ),
                 ),
@@ -462,70 +490,82 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   
   // Widget for loading state
   Widget _buildLoadingIndicator() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(color: Color(0xFF03A9F4)),
-          const SizedBox(height: 16),
-          Text(
-            'Loading your subjects...',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.white : Colors.black,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF03A9F4)),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading your subjects...',
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? Colors.white : Colors.black,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
   
   // Widget for error state
   Widget _buildErrorMessage() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 60,
-              color: Colors.red.withOpacity(0.8),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load subjects',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white : Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 60,
+                color: Colors.red.withOpacity(0.8),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error ?? 'Unknown error occurred',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load subjects',
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.white : Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _fetchStudentData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF03A9F4),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 8),
+              Text(
+                _error ?? 'Unknown error occurred',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+                ),
               ),
-              child: const Text('Try Again'),
-            ),
-          ],
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _fetchStudentData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF03A9F4),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
   
@@ -706,40 +746,44 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   
   // Widget for no data state
   Widget _buildNoDataMessage() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.folder_open,
-              size: 60,
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No subjects found',
-              style: TextStyle(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.folder_open,
+                size: 60,
                 color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white : Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                    ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'There are no subjects available for this semester',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+              const SizedBox(height: 16),
+              Text(
+                'No subjects found',
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.white : Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'There are no subjects available for this semester',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 

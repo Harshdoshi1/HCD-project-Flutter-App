@@ -41,6 +41,15 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
   int _totalCocurricularPoints = 0;
   int _totalExtracurricularPoints = 0;
 
+  // Pull-to-refresh handler to reload all data shown on the dashboard
+  Future<void> _onRefresh() async {
+    try {
+      await _loadUserData();
+    } catch (e) {
+      debugPrint('Parent dashboard refresh failed: $e');
+    }
+  }
+
 
   // Career Goals and Pathways
   final List<Map<String, dynamic>> _careerGoals = [
@@ -368,80 +377,84 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Welcome message and profile icon
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Welcome back,',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              _parentName,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Monitoring $_studentName\'s progress',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withOpacity(0.7),
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => ParentProfileScreen(
-                                  toggleTheme: widget.toggleTheme,
-                                  isDarkMode: isDark,
+              child: RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Welcome message and profile icon
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Welcome back,',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
+                              Text(
+                                _parentName,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              child: const Icon(
-                                Icons.person,
-                                color: Colors.white,
-                                size: 32,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Monitoring $_studentName\'s progress',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ParentProfileScreen(
+                                    toggleTheme: widget.toggleTheme,
+                                    isDarkMode: isDark,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.white24,
+                                child: Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     const SizedBox(height: 24),
                     
                     if (_isLoading)
@@ -534,6 +547,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
               ),
             ),
           ),
+          )
         ],
       ),
     );

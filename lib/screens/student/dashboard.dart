@@ -1068,7 +1068,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     // Subject slider with arrow navigation for Bloom's chart
                     if (title == 'Bloom\'s Taxonomy Analysis')
                       Container(
-                        constraints: const BoxConstraints(maxWidth: 250),
+                        constraints: const BoxConstraints(maxWidth: 180),
                         height: 40,
                         child: _availableSubjects.isEmpty
                             ? Container(
@@ -1988,7 +1988,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   _buildInfoRow(
                     'Academic Rank', 
                     _semesterSPIData.isNotEmpty 
-                      ? '${_semesterSPIData.last['rank']}th'
+                      ? '${_semesterSPIData.last['rank']}'
                       : 'N/A'
                   ),
                   _buildInfoRow(
