@@ -395,6 +395,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // Fetch event details from event master table
+  Future<Map<String, dynamic>?> _fetchEventDetails(String eventId, String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getUrl('events/getEventById/$eventId')),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (e) {
+      print('Error fetching event details for ID $eventId: $e');
+    }
+    return null;
+  }
+
+  // Fetch student points data and get event details
   Future<void> _loadActivityPoints() async {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -447,44 +468,73 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             }
           }
           
-          // Then, fetch detailed activities data
+          // Fetch student points data with CSV event IDs
           try {
-            final response = await http.post(
-              Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
+            final studentPointsResponse = await http.post(
+              Uri.parse(ApiConfig.getUrl('events/getStudentPointsWithEvents')),
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer $token',
               },
               body: json.encode({
                 'enrollmentNumber': _enrollmentNumber,
-                'semester': 'all'
               }),
             );
             
-            if (response.statusCode == 200) {
-              final data = json.decode(response.body);
+            if (studentPointsResponse.statusCode == 200) {
+              final studentPointsData = json.decode(studentPointsResponse.body);
+              print('Student points data: $studentPointsData');
               
-              if (data is List && data.isNotEmpty) {
-                setState(() {
-                  _activities = data;
-                  _isLoadingActivityPoints = false;
-                });
-              } else if (data is Map) {
-                // Handle case when API returns a map instead of a list
-                setState(() {
-                  _isLoadingActivityPoints = false;
-                });
+              List<dynamic> enrichedActivities = [];
+              
+              if (studentPointsData is List) {
+                for (var semesterData in studentPointsData) {
+                  final eventIds = semesterData['eventIds']?.toString() ?? '';
+                  final semester = semesterData['semester'];
+                  final cocurricularPoints = semesterData['cocurricularPoints'] ?? 0;
+                  final extracurricularPoints = semesterData['extracurricularPoints'] ?? 0;
+                  
+                  if (eventIds.isNotEmpty) {
+                    // Parse CSV event IDs
+                    final eventIdList = eventIds.split(',').map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
+                    
+                    // Fetch details for each event ID
+                    for (String eventId in eventIdList) {
+                      final eventDetails = await _fetchEventDetails(eventId, token);
+                      
+                      if (eventDetails != null) {
+                        enrichedActivities.add({
+                          'id': eventId,
+                          'eventId': eventId,
+                          'eventName': eventDetails['eventName'] ?? eventDetails['Event_Name'] ?? 'Unknown Event',
+                          'eventType': eventDetails['eventType'] ?? eventDetails['Event_Type'] ?? 'unknown',
+                          'eventDate': eventDetails['eventDate'] ?? eventDetails['Event_Date'],
+                          'description': eventDetails['description'] ?? eventDetails['Description'],
+                          'semester': semester,
+                          'totalCocurricular': cocurricularPoints,
+                          'totalExtracurricular': extracurricularPoints,
+                          'participationType': 'Participant', // Default since we don't have this in points table
+                        });
+                      }
+                    }
+                  }
+                }
               }
-            } else {
+              
               setState(() {
+                _activities = enrichedActivities;
                 _isLoadingActivityPoints = false;
               });
+              
+              print('Loaded ${enrichedActivities.length} enriched activities');
+            } else {
+              // Fallback to old method if new endpoint doesn't exist
+              await _loadActivityPointsFallback(token);
             }
           } catch (e) {
-            print('Error fetching activities: $e');
-            setState(() {
-              _isLoadingActivityPoints = false;
-            });
+            print('Error fetching student points data: $e');
+            // Fallback to old method
+            await _loadActivityPointsFallback(token);
           }
         } else {
           setState(() {
@@ -500,6 +550,47 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     } catch (e) {
       debugPrint('Error loading activity points: $e');
+      setState(() {
+        _isLoadingActivityPoints = false;
+      });
+    }
+  }
+
+  // Fallback method using old endpoint
+  Future<void> _loadActivityPointsFallback(String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'enrollmentNumber': _enrollmentNumber,
+          'semester': 'all'
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data is List && data.isNotEmpty) {
+          setState(() {
+            _activities = data;
+            _isLoadingActivityPoints = false;
+          });
+        } else {
+          setState(() {
+            _isLoadingActivityPoints = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoadingActivityPoints = false;
+        });
+      }
+    } catch (e) {
+      print('Error in fallback method: $e');
       setState(() {
         _isLoadingActivityPoints = false;
       });

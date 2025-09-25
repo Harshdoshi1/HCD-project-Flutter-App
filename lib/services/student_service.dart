@@ -275,6 +275,26 @@ class StudentService {
       return [];
     }
   }
+
+  // Fetch event details from event master table
+  Future<Map<String, dynamic>?> _fetchEventDetails(String eventId, String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/events/getEventById/$eventId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (e) {
+      print('Error fetching event details for ID $eventId: $e');
+    }
+    return null;
+  }
   
   // Get current semester points for all students
   Future<List<dynamic>> getAllStudentsCurrentSemesterPoints() async {
@@ -317,27 +337,91 @@ class StudentService {
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
             
-            // Calculate totals and collect event details
+            // Calculate totals and collect event details using the same approach as activities screen
             int totalCocurricular = 0;
             int totalExtracurricular = 0;
             List<Map<String, dynamic>> eventDetails = [];
             
-            if (data is List) {
-              for (var activity in data) {
-                totalCocurricular += int.parse(activity['totalCocurricular']?.toString() ?? '0');
-                totalExtracurricular += int.parse(activity['totalExtracurricular']?.toString() ?? '0');
+            if (data is List && data.isNotEmpty) {
+              // Extract event IDs from the response (same as StudentAnalysis.jsx)
+              Set<String> eventIds = {};
+              
+              for (var item in data) {
+                totalCocurricular += int.parse(item['totalCocurricular']?.toString() ?? '0');
+                totalExtracurricular += int.parse(item['totalExtracurricular']?.toString() ?? '0');
                 
-                // Collect event details with proper names
-                eventDetails.add({
-                  'eventId': activity['eventId'],
-                  'eventName': activity['eventName'] ?? activity['Event_Name'] ?? 'Unknown Event',
-                  'eventType': activity['eventType'] ?? activity['Event_Type'] ?? 'unknown',
-                  'eventDate': activity['eventDate'] ?? activity['Event_Date'],
-                  'participationType': activity['participationType'] ?? activity['Participation_Type'] ?? 'Participant',
-                  'cocurricularPoints': int.parse(activity['totalCocurricular']?.toString() ?? '0'),
-                  'extracurricularPoints': int.parse(activity['totalExtracurricular']?.toString() ?? '0'),
-                  'semester': activity['semester'] ?? semester,
-                });
+                // Extract event IDs (CSV format)
+                if (item['eventId'] != null) {
+                  final ids = item['eventId'].toString().split(',').map((id) => id.trim()).where((id) => id.isNotEmpty);
+                  eventIds.addAll(ids);
+                }
+              }
+              
+              if (eventIds.isNotEmpty) {
+                // Convert to comma-separated string as required by the API
+                final eventIdsString = eventIds.join(',');
+                
+                // Fetch event details from EventMaster table
+                try {
+                  final eventDetailsResponse = await http.post(
+                    Uri.parse('$baseUrl/events/fetchEventsByIds'),
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': 'Bearer $token',
+                    },
+                    body: json.encode({
+                      'eventIds': eventIdsString
+                    }),
+                  );
+                  
+                  if (eventDetailsResponse.statusCode == 200) {
+                    final eventDetailsData = json.decode(eventDetailsResponse.body);
+                    
+                    if (eventDetailsData['success'] == true && eventDetailsData['data'] is List) {
+                      // Process event details
+                      for (var event in eventDetailsData['data']) {
+                        // Handle different field names for points
+                        final eventType = (event['eventType'] ?? event['Event_Type'] ?? 'unknown').toString().toLowerCase();
+                        int eventCocurricularPoints = 0;
+                        int eventExtracurricularPoints = 0;
+                        
+                        // Determine points based on event type
+                        if (eventType.contains('co-curricular') || eventType.contains('cocurricular')) {
+                          eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                        } else if (eventType.contains('extra-curricular') || eventType.contains('extracurricular')) {
+                          eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                        } else {
+                          // If type is unclear, try to get both
+                          eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? '0');
+                          eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? '0');
+                          
+                          // If both are 0, use general points field
+                          if (eventCocurricularPoints == 0 && eventExtracurricularPoints == 0) {
+                            final generalPoints = int.parse(event['points']?.toString() ?? '0');
+                            if (eventType.contains('co') || eventType.contains('technical') || eventType.contains('academic')) {
+                              eventCocurricularPoints = generalPoints;
+                            } else {
+                              eventExtracurricularPoints = generalPoints;
+                            }
+                          }
+                        }
+                        
+                        eventDetails.add({
+                          'eventId': event['id'].toString(),
+                          'eventName': event['eventName'] ?? event['Event_Name'] ?? 'Unknown Event',
+                          'eventType': event['eventType'] ?? event['Event_Type'] ?? 'unknown',
+                          'eventDate': event['eventDate'] ?? event['Event_Date'],
+                          'participationType': event['participationType'] ?? event['position'] ?? 'Participant',
+                          'cocurricularPoints': eventCocurricularPoints,
+                          'extracurricularPoints': eventExtracurricularPoints,
+                          'semester': semester,
+                        });
+                      }
+                    }
+                  }
+                } catch (e) {
+                  print('Error fetching event details for rankings: $e');
+                }
               }
             } else if (data is Map && data.containsKey('totalCocurricular')) {
               totalCocurricular = int.parse(data['totalCocurricular']?.toString() ?? '0');
@@ -380,7 +464,7 @@ class StudentService {
     }
   }
   
-  // Get student activities for all semesters
+  // Get student activities for all semesters using studentpoints table
   Future<List<dynamic>> getStudentActivitiesBySemesters(String enrollmentNumber) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -391,7 +475,64 @@ class StudentService {
         return [];
       }
       
-      // Use the fetchEventsbyEnrollandSemester endpoint with 'all' for semester
+      try {
+        // First try to get student points data with CSV event IDs
+        final studentPointsResponse = await http.post(
+          Uri.parse('$baseUrl/events/getStudentPointsWithEvents'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({
+            'enrollmentNumber': enrollmentNumber,
+          }),
+        );
+        
+        if (studentPointsResponse.statusCode == 200) {
+          final studentPointsData = json.decode(studentPointsResponse.body);
+          List<dynamic> enrichedActivities = [];
+          
+          if (studentPointsData is List) {
+            for (var semesterData in studentPointsData) {
+              final eventIds = semesterData['eventIds']?.toString() ?? '';
+              final semester = semesterData['semester'];
+              final cocurricularPoints = semesterData['cocurricularPoints'] ?? 0;
+              final extracurricularPoints = semesterData['extracurricularPoints'] ?? 0;
+              
+              if (eventIds.isNotEmpty) {
+                // Parse CSV event IDs
+                final eventIdList = eventIds.split(',').map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
+                
+                // Fetch details for each event ID
+                for (String eventId in eventIdList) {
+                  final eventDetails = await _fetchEventDetails(eventId, token);
+                  
+                  if (eventDetails != null) {
+                    enrichedActivities.add({
+                      'id': eventId,
+                      'eventId': eventId,
+                      'eventName': eventDetails['eventName'] ?? eventDetails['Event_Name'] ?? 'Unknown Event',
+                      'eventType': eventDetails['eventType'] ?? eventDetails['Event_Type'] ?? 'unknown',
+                      'eventDate': eventDetails['eventDate'] ?? eventDetails['Event_Date'],
+                      'description': eventDetails['description'] ?? eventDetails['Description'],
+                      'semester': semester,
+                      'totalCocurricular': cocurricularPoints,
+                      'totalExtracurricular': extracurricularPoints,
+                      'participationType': 'Participant', // Default since we don't have this in points table
+                    });
+                  }
+                }
+              }
+            }
+          }
+          
+          return enrichedActivities;
+        }
+      } catch (e) {
+        print('Error fetching student points data: $e');
+      }
+      
+      // Fallback to old method
       final response = await http.post(
         Uri.parse('$baseUrl/events/fetchEventsbyEnrollandSemester'),
         headers: {

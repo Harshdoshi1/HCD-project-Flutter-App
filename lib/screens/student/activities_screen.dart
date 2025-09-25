@@ -151,7 +151,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
         // Will fallback to calculating from events if this fails
       }
       
-      // Get all semesters' activities
+      // Get all semesters' activities using the same approach as StudentAnalysis.jsx
       final allResponse = await http.post(
         Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
         headers: {
@@ -167,94 +167,135 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
       print('All semesters response status: ${allResponse.statusCode}');
       print('All semesters response body: ${allResponse.body}');
       
-      // For testing - if no activities are found, create some mock data
-      List<dynamic> activitiesList = [];
+      List<dynamic> enrichedActivitiesList = [];
       
       if (allResponse.statusCode == 200) {
         final data = json.decode(allResponse.body);
         
         if (data is List && data.isNotEmpty) {
-          activitiesList = data;
-        } else if (data is Map && data.containsKey('message')) {
-          // If there's a message but activities weren't found, add some mock data for testing
-          print('Adding mock activities for testing');
-          activitiesList = [
-            {
-              'id': 1,
-              'enrollmentNumber': _enrollmentNumber,
-              'semester': 4,
-              'eventId': 'E001',
-              'eventName': 'Debate Competition',
-              'eventType': 'co-curricular',
-              'eventDate': '2025-03-15',
-              'totalCocurricular': 10,
-              'totalExtracurricular': 0,
-              'participationTypeId': 'P001',
-              'participationType': 'Participant'
-            },
-            {
-              'id': 2,
-              'enrollmentNumber': _enrollmentNumber,
-              'semester': 4,
-              'eventId': 'E002',
-              'eventName': 'Coding Marathon',
-              'eventType': 'co-curricular',
-              'eventDate': '2025-04-20',
-              'totalCocurricular': 15,
-              'totalExtracurricular': 0,
-              'participationTypeId': 'P002',
-              'participationType': 'Winner'
-            },
-            {
-              'id': 3,
-              'enrollmentNumber': _enrollmentNumber,
-              'semester': 4,
-              'eventId': 'E003',
-              'eventName': 'Annual Sports Meet',
-              'eventType': 'extra-curricular',
-              'eventDate': '2025-02-10',
-              'totalCocurricular': 0,
-              'totalExtracurricular': 10,
-              'participationTypeId': 'P001',
-              'participationType': 'Participant'
-            },
-            {
-              'id': 4,
-              'enrollmentNumber': _enrollmentNumber,
-              'semester': 6,
-              'eventId': 'E004',
-              'eventName': 'College Fest',
-              'eventType': 'extra-curricular',
-              'eventDate': '2025-05-01',
-              'totalCocurricular': 0,
-              'totalExtracurricular': 20,
-              'participationTypeId': 'P003',
-              'participationType': 'Organizer'
-            }
-          ];
+          // Extract event IDs from the response (same as StudentAnalysis.jsx)
+          Set<String> eventIds = {};
+          Map<int, Map<String, int>> semesterPoints = {};
           
-          // Update totals based on mock data if we didn't get real totals
-          if (_totalCurrentCocurricular == 0 && _totalCurrentExtracurricular == 0) {
-            int totalCC = 0;
-            int totalEC = 0;
+          for (var item in data) {
+            final semester = int.tryParse(item['semester']?.toString() ?? '0') ?? 0;
+            final cocurricular = int.parse(item['totalCocurricular']?.toString() ?? '0');
+            final extracurricular = int.parse(item['totalExtracurricular']?.toString() ?? '0');
             
-            for (var activity in activitiesList) {
-              if (activity['semester'] == _currentSemester) {
-                totalCC += int.parse(activity['totalCocurricular']?.toString() ?? '0');
-                totalEC += int.parse(activity['totalExtracurricular']?.toString() ?? '0');
-              }
+            // Store semester points
+            if (!semesterPoints.containsKey(semester)) {
+              semesterPoints[semester] = {'cocurricular': 0, 'extracurricular': 0};
             }
+            semesterPoints[semester]!['cocurricular'] = semesterPoints[semester]!['cocurricular']! + cocurricular;
+            semesterPoints[semester]!['extracurricular'] = semesterPoints[semester]!['extracurricular']! + extracurricular;
             
-            setState(() {
-              _totalCurrentCocurricular = totalCC;
-              _totalCurrentExtracurricular = totalEC;
-            });
+            // Extract event IDs (CSV format)
+            if (item['eventId'] != null) {
+              final ids = item['eventId'].toString().split(',').map((id) => id.trim()).where((id) => id.isNotEmpty);
+              eventIds.addAll(ids);
+            }
           }
+          
+          print('Extracted event IDs: $eventIds');
+          
+          if (eventIds.isNotEmpty) {
+            // Convert to comma-separated string as required by the API
+            final eventIdsString = eventIds.join(',');
+            print('Sending event IDs as string: $eventIdsString');
+            
+            // Fetch event details from EventMaster table (same endpoint as StudentAnalysis.jsx)
+            final eventDetailsResponse = await http.post(
+              Uri.parse(ApiConfig.getUrl('events/fetchEventsByIds')),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'eventIds': eventIdsString
+              }),
+            );
+            
+            print('Event details response: ${eventDetailsResponse.body}');
+            
+            if (eventDetailsResponse.statusCode == 200) {
+              final eventDetailsData = json.decode(eventDetailsResponse.body);
+              
+              if (eventDetailsData['success'] == true && eventDetailsData['data'] is List) {
+                // Process event details and create enriched activity list
+                for (var event in eventDetailsData['data']) {
+                  // Find which semester this event belongs to by checking original data
+                  int eventSemester = _currentSemester ?? 1; // Default
+                  int cocurricularPoints = 0;
+                  int extracurricularPoints = 0;
+                  
+                  // Find semester and points for this event
+                  for (var item in data) {
+                    if (item['eventId']?.toString().contains(event['id'].toString()) == true) {
+                      eventSemester = int.tryParse(item['semester']?.toString() ?? '0') ?? (_currentSemester ?? 1);
+                      cocurricularPoints = int.parse(item['totalCocurricular']?.toString() ?? '0');
+                      extracurricularPoints = int.parse(item['totalExtracurricular']?.toString() ?? '0');
+                      break;
+                    }
+                  }
+                  
+                  // Get individual event points from the event master table
+                  // Handle different field names for points
+                  final eventType = (event['eventType'] ?? event['Event_Type'] ?? 'unknown').toString().toLowerCase();
+                  int eventCocurricularPoints = 0;
+                  int eventExtracurricularPoints = 0;
+                  
+                  // Determine points based on event type
+                  if (eventType.contains('co-curricular') || eventType.contains('cocurricular')) {
+                    eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                  } else if (eventType.contains('extra-curricular') || eventType.contains('extracurricular')) {
+                    eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                  } else {
+                    // If type is unclear, try to get both
+                    eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? '0');
+                    eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? '0');
+                    
+                    // If both are 0, use general points field
+                    if (eventCocurricularPoints == 0 && eventExtracurricularPoints == 0) {
+                      final generalPoints = int.parse(event['points']?.toString() ?? '0');
+                      if (eventType.contains('co') || eventType.contains('technical') || eventType.contains('academic')) {
+                        eventCocurricularPoints = generalPoints;
+                      } else {
+                        eventExtracurricularPoints = generalPoints;
+                      }
+                    }
+                  }
+                  
+                  enrichedActivitiesList.add({
+                    'id': event['id'],
+                    'eventId': event['id'].toString(),
+                    'eventName': event['eventName'] ?? event['Event_Name'] ?? 'Unknown Event',
+                    'eventType': event['eventType'] ?? event['Event_Type'] ?? 'unknown',
+                    'eventDate': event['eventDate'] ?? event['Event_Date'],
+                    'description': event['description'] ?? event['Description'],
+                    'semester': eventSemester,
+                    'totalCocurricular': cocurricularPoints, // Total for semester
+                    'totalExtracurricular': extracurricularPoints, // Total for semester
+                    'eventCocurricularPoints': eventCocurricularPoints, // Individual event points
+                    'eventExtracurricularPoints': eventExtracurricularPoints, // Individual event points
+                    'participationType': event['participationType'] ?? event['position'] ?? 'Participant',
+                  });
+                }
+                
+                print('Enriched ${enrichedActivitiesList.length} activities with event details');
+              } else {
+                print('Unexpected event details format: ${eventDetailsData}');
+              }
+            } else {
+              print('Failed to fetch event details: ${eventDetailsResponse.statusCode}');
+            }
+          }
+        } else if (data is Map && data.containsKey('message')) {
+          print('No activities found: ${data['message']}');
         }
       }
       
       setState(() {
-        _activities = activitiesList;
+        _activities = enrichedActivitiesList;
         _isLoading = false;
       });
     } catch (e) {
@@ -723,8 +764,8 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                       ),
                       child: Text(
                         (activity['eventType'] ?? activity['Event_Type']) == 'co-curricular' 
-                            ? 'CC: ${activity['totalCocurricular'] ?? activity['Total_Cocurricular'] ?? 0}' 
-                            : 'EC: ${activity['totalExtracurricular'] ?? activity['Total_Extracurricular'] ?? 0}',
+                            ? 'CC: ${activity['eventCocurricularPoints'] ?? activity['totalCocurricular'] ?? activity['Total_Cocurricular'] ?? 0}' 
+                            : 'EC: ${activity['eventExtracurricularPoints'] ?? activity['totalExtracurricular'] ?? activity['Total_Extracurricular'] ?? 0}',
                         style: TextStyle(
                           color: (activity['eventType'] ?? activity['Event_Type']) == 'co-curricular'
                               ? Colors.blue

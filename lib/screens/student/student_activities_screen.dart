@@ -45,7 +45,7 @@ class _StudentActivitiesScreenState extends State<StudentActivitiesScreen> {
         throw Exception('Invalid enrollment number');
       }
       
-      // Fetch activities for all semesters
+      // Fetch activities for all semesters using the enhanced method
       final activities = await _studentService.getStudentActivitiesBySemesters(
         widget.student.enrollmentNumber
       );
@@ -371,8 +371,9 @@ class _StudentActivitiesScreenState extends State<StudentActivitiesScreen> {
                   ...semesterActivities.map((activity) {
                     final eventName = activity['eventName'] ?? activity['Event_Name'] ?? activity['name'] ?? 'Unknown Event';
                     final eventDate = activity['eventDate'] ?? activity['Event_Date'] ?? 'Unknown Date';
-                    final cocurricular = int.tryParse(activity['totalCocurricular']?.toString() ?? activity['Total_Cocurricular']?.toString() ?? '0') ?? 0;
-                    final extracurricular = int.tryParse(activity['totalExtracurricular']?.toString() ?? activity['Total_Extracurricular']?.toString() ?? '0') ?? 0;
+                    // Use individual event points if available, otherwise fall back to total points
+                    final cocurricular = int.tryParse(activity['cocurricularPoints']?.toString() ?? activity['totalCocurricular']?.toString() ?? activity['Total_Cocurricular']?.toString() ?? '0') ?? 0;
+                    final extracurricular = int.tryParse(activity['extracurricularPoints']?.toString() ?? activity['totalExtracurricular']?.toString() ?? activity['Total_Extracurricular']?.toString() ?? '0') ?? 0;
                     final participationType = activity['participationType'] ?? activity['Participation_Type'] ?? 'Unknown';
                     
                     return Card(
