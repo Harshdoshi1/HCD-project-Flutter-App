@@ -349,7 +349,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerPr
                   padding: const EdgeInsets.all(16.0),
                   child: Center(
                     child: Text(
-                      'My Activities',
+                      '${_studentName ?? 'Student'}\'s Activities',
                       style: TextStyle(
                         color: isDark ? Colors.white : Colors.black,
                         fontSize: 24,
