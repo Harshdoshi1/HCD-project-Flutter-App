@@ -231,13 +231,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           _isLoading = false;
         });
 
-        // Show error dialog
+        // Show error dialog with custom message for timeout
         if (!mounted) return;
+        String errorMessage = e.toString().replaceAll('Exception: ', '');
+        
+        // Check if it's a timeout error
+        if (errorMessage.contains('TimeoutException') || errorMessage.contains('timeout')) {
+          errorMessage = 'Please check your internet connection and try again.';
+        }
+        
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Login Failed'),
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(errorMessage),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -276,8 +283,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             decoration: InputDecoration(
               labelText: 'Email',
               hintText: _selectedRole == 'parent' 
-                  ? 'parent.email@marwadieducation.edu.in'
-                  : 'student.email@marwadieducation.edu.in',
+                  ? 'parent.email@marwadiuniversity.ac.in'
+                  : 'student.email@marwadiuniversity.ac.in',
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -527,35 +534,38 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           const SizedBox(height: 8),
           
           // Login Button
-          SizedBox(
-            height: 55,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _performLogin,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF03A9F4),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          Center(
+            child: SizedBox(
+              width: 200, // Fixed width to center the button
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _performLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF03A9F4),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
                 ),
-                elevation: 4,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'LOGIN',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
               ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text(
-                      'LOGIN',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
             ),
           ),
         ],

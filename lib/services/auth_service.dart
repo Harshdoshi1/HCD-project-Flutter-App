@@ -56,7 +56,7 @@ class AuthService {
           'email': email,
           'enrollmentNumber': enrollmentNumber,
         }),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 20));
 
       print('Response status code: ${response.statusCode}');
       print('Response body: ${response.body}');

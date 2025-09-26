@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import '../../../providers/user_provider.dart';
 import '../../../services/academic_service.dart';
 import '../../utils/api_config.dart';
+import '../main_navigation.dart';
+import '../login_page.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -29,6 +31,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
   String _studentName = '';
   String _enrollmentNumber = '';
   int? _currentSemester;
+  String? _batch;
   String _dailyQuote = 'Education is the most powerful weapon which you can use to change the world.';
   
   // Academic data
@@ -67,6 +70,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
           _studentName = user.name;
           _enrollmentNumber = user.enrollmentNumber;
           _currentSemester = user.currentSemester;
+          _batch = user.batch;
         });
 
         // Load academic data
@@ -287,7 +291,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Welcome, ${_userName.isNotEmpty ? _userName : 'Parent'}',
+                              'Welcome back!',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
@@ -296,7 +300,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                             ),
                             if (_studentName.isNotEmpty)
                               Text(
-                                _studentName,
+                                "${_studentName}'s Parents",
                                 style: TextStyle(
                                   fontSize: 24,
                                   color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
@@ -308,7 +312,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                               _dailyQuote,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: Colors.grey[500],
                                 fontStyle: FontStyle.italic,
                               ),
                               maxLines: 2,
@@ -318,7 +322,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                         ),
                       ),
                       Container(
-                        alignment: Alignment.center,
+                        margin: EdgeInsets.only(top: 8, right: 8),
+                        alignment: Alignment.topRight,
                         child: PopupMenuButton<String>(
                           icon: Icon(
                             Icons.more_vert,
@@ -331,6 +336,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                               _showAboutDialog(context);
                             } else if (value == 'logout') {
                               _showLogoutDialog(context);
+                            } else if (value == 'report') {
+                              _showReportIssueDialog(context);
                             }
                           },
                           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -346,6 +353,13 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                               child: ListTile(
                                 leading: Icon(Icons.info),
                                 title: Text('About'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'report',
+                              child: ListTile(
+                                leading: Icon(Icons.bug_report),
+                                title: Text('Report an Issue'),
                               ),
                             ),
                             const PopupMenuItem<String>(
@@ -538,34 +552,47 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                     final bool isCoCurricular = activity['type'] == 'co-curricular';
                     final Color activityColor = isCoCurricular ? Colors.blue : Colors.orange;
                     
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            activityColor.withOpacity(0.1),
-                            Colors.white.withOpacity(0.05),
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: activityColor.withOpacity(0.3),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: activityColor.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
+                    return GestureDetector(
+                      onTap: () {
+                        // Navigate to activities tab (index 2 for parent)
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MainNavigation(
+                              toggleTheme: widget.toggleTheme,
+                              initialTabIndex: 2,
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Row(
-                          children: [
+                        );
+                      },
+                      child: Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              activityColor.withOpacity(0.1),
+                              Colors.white.withOpacity(0.05),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: activityColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: activityColor.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Row(
+                            children: [
                             Container(
                               padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -680,7 +707,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                                 ),
                               ],
                             ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -717,7 +745,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
               Icons.phone,
               Colors.green,
               () {
-                // Contact CC functionality
+                _showContactCCDialog(context);
               },
             ),
           ),
@@ -728,7 +756,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
               Icons.person,
               Colors.purple,
               () {
-                // Contact HOD functionality
+                _showContactHODDialog(context);
               },
             ),
           ),
@@ -797,6 +825,185 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
     );
   }
 
+  void _showReportIssueDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.bug_report,
+                color: Colors.orange,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Report an Issue',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.email,
+                          color: Colors.orange,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Contact Information',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'If you find any issue in the app, please send a screenshot to:',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black87,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.mail,
+                            color: Colors.orange,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'harshdoshiyt02@gmail.com',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.copy,
+                            color: Colors.orange.withOpacity(0.7),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: isDark ? Colors.blue[300] : Colors.blue[600],
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Please include a screenshot and describe the issue you encountered.',
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: isDark ? Colors.white70 : Colors.black54,
+            ),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Copy email to clipboard
+              Clipboard.setData(const ClipboardData(text: 'harshdoshiyt02@gmail.com'));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Email copied to clipboard!'),
+                  backgroundColor: Colors.orange,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Copy Email'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showLogoutDialog(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
@@ -840,10 +1047,21 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
 
   void _logout() async {
     try {
+      // Clear user data from provider
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       userProvider.clearUser();
       
-      Navigator.of(context).pushReplacementNamed('/login');
+      // Clear SharedPreferences data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      
+      // Navigate to login page using MaterialPageRoute
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => LoginPage(toggleTheme: widget.toggleTheme),
+        ),
+        (route) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -853,5 +1071,369 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
         ),
       );
     }
+  }
+
+  void _showContactCCDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Always show Mitesh Solanki as CC
+    bool isCCAvailable = true;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.person, color: Colors.green, size: 24),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Contact CC',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: isCCAvailable ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.withOpacity(0.1), Colors.green.withOpacity(0.05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.green.withOpacity(0.2),
+                      child: Text(
+                        'MS',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Mitesh Solanki',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Class Coordinator',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                        SizedBox(width: 4),
+                        Text(
+                          '9586571164',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: '9586571164'));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Phone number copied to clipboard'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.copy, size: 18),
+                      label: Text('Copy'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[600],
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _openWhatsApp('9586571164');
+                      },
+                      icon: Icon(Icons.chat, size: 18),
+                      label: Text('WhatsApp'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ) : Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange, size: 48),
+                SizedBox(height: 12),
+                Text(
+                  'CC Not Available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Class Coordinator is only available for batches 22-26',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showContactHODDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final List<Map<String, String>> hods = [
+      {
+        'name': 'Chandrasinh Parmar',
+        'phone': '9824416484',
+        'initials': 'CP',
+      },
+      {
+        'name': 'Arjav Bavarva',
+        'phone': '7016685360',
+        'initials': 'AB',
+      },
+    ];
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.purple.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.person_pin, color: Colors.purple, size: 24),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Contact HOD',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: hods.map((hod) => Container(
+              margin: EdgeInsets.only(bottom: 16),
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.purple.withOpacity(0.1), Colors.purple.withOpacity(0.05)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purple.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.purple.withOpacity(0.2),
+                        child: Text(
+                          hod['initials']!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hod['name']!,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Head of Department',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                                SizedBox(width: 4),
+                                Text(
+                                  hod['phone']!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: hod['phone']!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${hod['name']}\'s number copied'),
+                                backgroundColor: Colors.purple,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          icon: Icon(Icons.copy, size: 16),
+                          label: Text('Copy', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[600],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            _openWhatsApp(hod['phone']!);
+                          },
+                          icon: Icon(Icons.chat, size: 16),
+                          label: Text('WhatsApp', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openWhatsApp(String phoneNumber) {
+    // For now, we'll show a message that WhatsApp functionality would be implemented
+    // In a real app, you would use url_launcher to open WhatsApp
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Opening WhatsApp chat with $phoneNumber...'),
+        backgroundColor: Color(0xFF25D366),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 }
