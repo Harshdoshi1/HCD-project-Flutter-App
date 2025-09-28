@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../../services/student_service.dart';
 import '../../models/student_ranking_model.dart';
 import 'student_detail_screen.dart';
+import '../../widgets/glass_card.dart';
 import 'student_activities_screen.dart';
 import 'student_grades_screen.dart';
 
@@ -22,6 +23,8 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
   late PageController _pageController;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   
@@ -106,7 +109,28 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
 
     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
 
+    // Initialize glow animation controller
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    );
+
+    _glowAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    ));
+
     _fadeController.forward();
+    
+    // Start glow animation with 1 second delay and repeat infinitely
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        _glowController.repeat(reverse: true);
+      }
+    });
     
     // Fetch all students data
     _fetchStudents();
@@ -200,6 +224,7 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     _tabController.dispose();
     _pageController.dispose();
     _fadeController.dispose();
+    _glowController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -244,113 +269,132 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
           SafeArea(
             child: Column(
               children: [
-                // Enhanced Tab bar with better UI
+                // Enhanced Tab bar with premium glass morphism design
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  height: 50,
+                  height: 56,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
                         isDark 
-                            ? Colors.white.withOpacity(0.08) 
-                            : Colors.black.withOpacity(0.08),
+                            ? Colors.white.withOpacity(0.12) 
+                            : Colors.white.withOpacity(0.9),
                         isDark 
-                            ? Colors.white.withOpacity(0.03) 
-                            : Colors.black.withOpacity(0.03),
+                            ? Colors.white.withOpacity(0.05) 
+                            : Colors.white.withOpacity(0.7),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(28),
                     border: Border.all(
-                      color: const Color(0xFF03A9F4).withOpacity(0.3),
+                      color: isDark 
+                          ? Colors.white.withOpacity(0.2)
+                          : const Color(0xFF03A9F4).withOpacity(0.3),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF03A9F4).withOpacity(0.1),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        color: isDark 
+                            ? Colors.black.withOpacity(0.3)
+                            : const Color(0xFF03A9F4).withOpacity(0.15),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                        spreadRadius: 0,
+                      ),
+                      BoxShadow(
+                        color: isDark 
+                            ? Colors.white.withOpacity(0.05)
+                            : Colors.white.withOpacity(0.8),
+                        blurRadius: 6,
+                        offset: const Offset(0, -2),
+                        spreadRadius: 0,
                       ),
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(28),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                       child: TabBar(
                         controller: _tabController,
                         indicator: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(24),
                           gradient: LinearGradient(
                             colors: [
-                              const Color(0xFF03A9F4).withOpacity(0.3),
-                              const Color(0xFF03A9F4).withOpacity(0.15),
+                              const Color(0xFF03A9F4).withOpacity(0.8),
+                              const Color(0xFF0288D1).withOpacity(0.6),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF03A9F4).withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: const Color(0xFF03A9F4).withOpacity(0.6),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                              spreadRadius: 0,
                             ),
                             BoxShadow(
-                              color: Colors.white.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, -1),
+                              color: Colors.white.withOpacity(isDark ? 0.1 : 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, -2),
+                              spreadRadius: 0,
                             ),
                           ],
                         ),
-                        indicatorPadding: const EdgeInsets.all(4),
+                        indicatorPadding: const EdgeInsets.all(6),
                         dividerColor: Colors.transparent,
-                        labelColor: isDark ? Colors.white : Colors.black,
+                        labelColor: Colors.white,
                         unselectedLabelColor: isDark 
-                            ? Colors.white.withOpacity(0.6) 
-                            : Colors.black.withOpacity(0.6),
+                            ? Colors.white.withOpacity(0.7) 
+                            : Colors.black.withOpacity(0.7),
                         labelStyle: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.bold,
                           fontSize: 15,
+                          letterSpacing: 0.5,
                         ),
                         unselectedLabelStyle: const TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
+                          letterSpacing: 0.3,
                         ),
                         tabs: [
                           Tab(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    Icons.school,
-                                    size: 18,
-                                    color: _tabController.index == 0
-                                        ? (isDark ? Colors.white : Colors.black)
-                                        : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6)),
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Icon(
+                                      Icons.school_rounded,
+                                      size: 20,
+                                    ),
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 8),
                                   const Text('Academic'),
                                 ],
                               ),
                             ),
                           ),
                           Tab(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    Icons.emoji_events,
-                                    size: 18,
-                                    color: _tabController.index == 1
-                                        ? (isDark ? Colors.white : Colors.black)
-                                        : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6)),
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Icon(
+                                      Icons.emoji_events_rounded,
+                                      size: 20,
+                                    ),
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 8),
                                   const Text('Activities'),
                                 ],
                               ),
@@ -362,26 +406,53 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
                   ),
                 ),
                 
-                // Search bar
+                // Enhanced Search bar with premium design
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  height: 50,
+                  height: 56,
                   decoration: BoxDecoration(
-                    color: isDark 
-                        ? Colors.white.withOpacity(0.05) 
-                        : Colors.black.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(25),
+                    gradient: LinearGradient(
+                      colors: [
+                        isDark 
+                            ? Colors.white.withOpacity(0.08) 
+                            : Colors.white.withOpacity(0.9),
+                        isDark 
+                            ? Colors.white.withOpacity(0.03) 
+                            : Colors.white.withOpacity(0.7),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
                     border: Border.all(
                       color: isDark 
-                          ? Colors.white.withOpacity(0.1) 
-                          : Colors.black.withOpacity(0.1),
-                      width: 1,
+                          ? Colors.white.withOpacity(0.15) 
+                          : const Color(0xFF03A9F4).withOpacity(0.2),
+                      width: 1.5,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark 
+                            ? Colors.black.withOpacity(0.2)
+                            : const Color(0xFF03A9F4).withOpacity(0.1),
+                        blurRadius: 15,
+                        offset: const Offset(0, 6),
+                        spreadRadius: 0,
+                      ),
+                      BoxShadow(
+                        color: isDark 
+                            ? Colors.white.withOpacity(0.03)
+                            : Colors.white.withOpacity(0.6),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
+                        spreadRadius: 0,
+                      ),
+                    ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(28),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                       child: TextField(
                         controller: _searchController,
                         onChanged: (value) {
@@ -390,39 +461,57 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
                           });
                         },
                         style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black,
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Search students...',
+                          hintText: 'Search by name or enrollment...',
                           hintStyle: TextStyle(
                             color: isDark 
-                                ? Colors.white.withOpacity(0.5) 
-                                : Colors.black.withOpacity(0.5),
+                                ? Colors.white.withOpacity(0.6) 
+                                : Colors.black.withOpacity(0.6),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w400,
                           ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: isDark 
-                                ? Colors.white.withOpacity(0.5) 
-                                : Colors.black.withOpacity(0.5),
+                          prefixIcon: Container(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.search_rounded,
+                              color: isDark 
+                                  ? Colors.white.withOpacity(0.7) 
+                                  : const Color(0xFF03A9F4),
+                              size: 22,
+                            ),
                           ),
                           suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.clear,
+                              ? Container(
+                                  margin: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
                                     color: isDark 
-                                        ? Colors.white.withOpacity(0.5) 
-                                        : Colors.black.withOpacity(0.5),
+                                        ? Colors.white.withOpacity(0.1)
+                                        : Colors.black.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      _searchQuery = '';
-                                    });
-                                  },
+                                  child: IconButton(
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      color: isDark 
+                                          ? Colors.white.withOpacity(0.8) 
+                                          : Colors.black.withOpacity(0.6),
+                                      size: 18,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  ),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         ),
                       ),
                     ),
@@ -458,7 +547,22 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     
     // Show loading indicator while data is being fetched
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF03A9F4)),
+            const SizedBox(height: 16),
+            Text(
+              'Loading students...',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
     }
     
     // Show error message if there was an error fetching data
@@ -568,100 +672,167 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
           );
         }
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? Colors.white.withOpacity(0.1) 
-                  : Colors.black.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.2) 
-                    : Colors.black.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Rank circle
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _getRankColor(rank).withOpacity(0.2),
-                      border: Border.all(
-                        color: _getRankColor(rank),
-                        width: 2,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        child: GlassCard(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(18),
+          child: Row(
+                  children: [
+                    // Enhanced Rank circle with gradient and glow animation for top 3
+                    rank <= 3 
+                        ? AnimatedBuilder(
+                            animation: _glowAnimation,
+                            builder: (context, child) {
+                              return Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      _getRankColor(rank).withOpacity(0.3),
+                                      _getRankColor(rank).withOpacity(0.1),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  border: Border.all(
+                                    color: _getRankColor(rank),
+                                    width: 2.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _getRankColor(rank).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                    // Animated glow effect
+                                    BoxShadow(
+                                      color: _getRankColor(rank).withOpacity(_glowAnimation.value * 0.6),
+                                      blurRadius: _glowAnimation.value * 20,
+                                      spreadRadius: _glowAnimation.value * 4,
+                                      offset: const Offset(0, 0),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$rank',
+                                    style: TextStyle(
+                                      color: _getRankColor(rank),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  _getRankColor(rank).withOpacity(0.3),
+                                  _getRankColor(rank).withOpacity(0.1),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: _getRankColor(rank),
+                                width: 2.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _getRankColor(rank).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$rank',
+                                style: TextStyle(
+                                  color: _getRankColor(rank),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                    const SizedBox(width: 18),
+                    // Student details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: isDark 
+                                  ? Colors.white.withOpacity(0.75) 
+                                  : Colors.black.withOpacity(0.7),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Center(
-                      child: Text(
-                        '$rank',
-                        style: TextStyle(
-                          color: _getRankColor(rank),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                    // Enhanced Arrow icon
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            isDark 
+                                ? Colors.white.withOpacity(0.15) 
+                                : const Color(0xFF03A9F4).withOpacity(0.1),
+                            isDark 
+                                ? Colors.white.withOpacity(0.05) 
+                                : const Color(0xFF03A9F4).withOpacity(0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(
+                          color: isDark 
+                              ? Colors.white.withOpacity(0.2) 
+                              : const Color(0xFF03A9F4).withOpacity(0.3),
+                          width: 1,
                         ),
                       ),
+                      child: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: isDark 
+                            ? Colors.white.withOpacity(0.8) 
+                            : const Color(0xFF03A9F4),
+                        size: 16,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Student details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: isDark 
-                                ? Colors.white.withOpacity(0.7) 
-                                : Colors.black.withOpacity(0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Arrow icon
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark 
-                          ? Colors.white.withOpacity(0.1) 
-                          : Colors.black.withOpacity(0.1),
-                    ),
-                    child: Icon(
-                      Icons.arrow_forward_ios,
-                      color: isDark ? Colors.white : Colors.black,
-                      size: 14,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            
           ),
-        ),
-      ),
-    );
+        );
   }
 
   Color _getRankColor(int rank) {

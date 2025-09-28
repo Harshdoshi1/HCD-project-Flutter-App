@@ -10,6 +10,7 @@ import '../../services/student_analysis_service.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import 'subject_detail_screen.dart';
+import '../../widgets/glass_card.dart';
 
 class SubjectsScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -20,20 +21,29 @@ class SubjectsScreen extends StatefulWidget {
   State<SubjectsScreen> createState() => _SubjectsScreenState();
 }
 
-class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProviderStateMixin {
-  int _selectedSemester = 1;
+class _SubjectsScreenState extends State<SubjectsScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late AnimationController _controller;
+  late AnimationController _semesterController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _scaleAnimation;
   
   // New state variables for API data
   final StudentService _studentService = StudentService();
   final StudentAnalysisService _analysisService = StudentAnalysisService();
   StudentComponentData? _studentData;
-  StudentPerformanceModel? _performanceData;
+  Map<int, StudentPerformanceModel> _allSemesterData = {};
   bool _isLoading = true;
   bool _useNewApi = true; // Flag to switch between old and new API
   String? _error;
+  
+  // Semester navigation
+  int _selectedSemester = 1;
+  PageController _pageController = PageController();
+  ScrollController _semesterScrollController = ScrollController();
+
+  @override
+  bool get wantKeepAlive => true; // persist state when navigating tabs
 
   // Pull-to-refresh handler
   Future<void> _onRefresh() async {
@@ -170,7 +180,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     },
   ];
 
-  // Method to fetch student data using new performance API
+  // Method to fetch student data using new performance API for all semesters
   Future<void> _fetchStudentDataNew() async {
     try {
       setState(() {
@@ -188,16 +198,30 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
       
       print('Attempting to fetch performance data for enrollment: ${user.enrollmentNumber}');
       
-      // Fetch performance data for current semester
-      final result = await _analysisService.getSubjectWisePerformance(
-        user.enrollmentNumber, 
-        _selectedSemester
-      );
+      // First, get basic student data to know how many semesters exist
+      await _fetchStudentDataOld();
       
-      print('Performance API response received: ${result.toString()}');
+      if (_studentData != null && _studentData!.semesters.isNotEmpty) {
+        // Fetch performance data for all available semesters
+        _allSemesterData.clear();
+        
+        for (final semesterData in _studentData!.semesters) {
+          try {
+            final result = await _analysisService.getSubjectWisePerformance(
+              user.enrollmentNumber, 
+              semesterData.semesterNumber
+            );
+            
+            _allSemesterData[semesterData.semesterNumber] = StudentPerformanceModel.fromJson(result);
+            print('Fetched data for semester ${semesterData.semesterNumber}');
+          } catch (e) {
+            print('Error fetching semester ${semesterData.semesterNumber}: $e');
+            // Continue with other semesters even if one fails
+          }
+        }
+      }
       
       setState(() {
-        _performanceData = StudentPerformanceModel.fromJson(result);
         _isLoading = false;
       });
     } catch (e) {
@@ -234,9 +258,9 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
         _studentData = StudentComponentData.fromJson(result);
         _isLoading = false;
         
-        // Set the selected semester to 1 if there are semesters available
-        if (_studentData != null && _studentData!.semesters.isNotEmpty) {
-          _selectedSemester = 1;
+        // Set initial selected semester
+        if (_studentData!.semesters.isNotEmpty) {
+          _selectedSemester = _studentData!.semesters.first.semesterNumber;
         }
       });
     } catch (e) {
@@ -264,11 +288,18 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
+    _semesterController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
     _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
     _controller.forward();
     
@@ -279,11 +310,15 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   @override
   void dispose() {
     _controller.dispose();
+    _semesterController.dispose();
+    _pageController.dispose();
+    _semesterScrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // keep-alive
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -292,7 +327,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
       backgroundColor: isDark ? Colors.black : Colors.white,
       body: Stack(
         children: [
-          // Gradient background
+          // Gradient background (matched with parent screen)
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -306,293 +341,670 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               ),
             ),
           ),
-          Column(
-            children: [
-              // Header section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ClipRRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'My Subjects',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            SlideTransition(
-                              position: _slideAnimation,
-                              child: SizedBox(
-                                height: 36, // Reduced height for the semester pills
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: _isLoading || _studentData == null || _performanceData == null
-                                    ? List.generate(1, (index) {
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          child: _buildSemesterChip(1),
-                                        );
-                                      })
-                                    : _performanceData != null
-                                    ? List.generate(_performanceData!.student.currentSemester, (index) {
-                                        final semester = index + 1;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          child: _buildSemesterChip(semester),
-                                        );
-                                      })
-                                    : _studentData != null
-                                    ? List.generate(_studentData!.semesters.length, (index) {
-                                        final semester = _studentData!.semesters[index].semesterNumber;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          child: _buildSemesterChip(semester),
-                                        );
-                                      })
-                                    : [],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+          SafeArea(
+            child: Column(
+              children: [
+                // Modern header with semester navigation
+                _buildModernHeader(isDark),
+                // Subject content
+                Expanded(
+                  child: _buildSubjectContent(isDark),
                 ),
-              ),
-              // Subject list
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _onRefresh,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: _isLoading 
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: [
-                                _buildLoadingIndicator(),
-                              ],
-                            )
-                          : _error != null
-                              ? ListView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  children: [
-                                    _buildErrorMessage(),
-                                  ],
-                                )
-                              : _performanceData != null
-                                  ? _buildPerformanceSubjectsList()
-                                  : (_studentData == null || _studentData!.semesters.isEmpty)
-                                      ? ListView(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          children: [
-                                            _buildNoDataMessage(),
-                                          ],
-                                        )
-                                      : ListView.builder(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          padding: const EdgeInsets.all(16),
-                                          itemCount: _selectedSemester <= _studentData!.semesters.length
-                                              ? _getSubjectsForSelectedSemester().length
-                                              : 0,
-                                          itemBuilder: (context, index) {
-                                            if (_selectedSemester > _studentData!.semesters.length) return const SizedBox();
-                                            final subject = _getSubjectsForSelectedSemester()[index];
-                                            return _buildSubjectCardFromApiData(subject, context);
-                                          },
-                                        ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSemesterChip(int semester) {
-    final isSelected = _selectedSemester == semester;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedSemester = semester;
-        });
-        // Refetch data for the new semester if using new API
-        if (_useNewApi) {
-          _fetchStudentDataNew();
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? (isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected 
-                ? (isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5))
-                : (isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-            width: 1,
+
+  // Modern header with semester navigation
+  Widget _buildModernHeader(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Title
+          ScaleTransition(
+            scale: _scaleAnimation,
+            child: Text(
+              'My Subjects',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
           ),
-        ),
-        child: Text(
-          'Sem $semester',
-          style: TextStyle(
-            color: isSelected 
-                ? (isDark ? Colors.white : Colors.black)
-                : (isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          const SizedBox(height: 20),
+          // Semester navigation with arrows
+          if (_studentData != null && _studentData!.semesters.isNotEmpty)
+            _buildSemesterNavigation(isDark),
+        ],
+      ),
+    );
+  }
+
+  // Semester navigation with slideable buttons and arrows
+  Widget _buildSemesterNavigation(bool isDark) {
+    final semesters = _studentData!.semesters;
+    
+    return Container(
+      height: 66,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          // Left arrow
+          _buildNavigationArrow(
+            icon: Icons.chevron_left,
+            onTap: _selectedSemester > 1 ? () => _changeSemester(_selectedSemester - 1) : null,
+          ),
+          // Semester buttons
+          Expanded(
+            child: Container(
+              height: 52,
+              child: ListView.builder(
+                controller: _semesterScrollController,
+                scrollDirection: Axis.horizontal,
+                itemCount: semesters.length,
+                itemBuilder: (context, index) {
+                  final semester = semesters[index].semesterNumber;
+                  return _buildSemesterButton(semester, isDark);
+                },
+              ),
+            ),
+          ),
+          // Right arrow
+          _buildNavigationArrow(
+            icon: Icons.chevron_right,
+            onTap: _selectedSemester < semesters.length ? () => _changeSemester(_selectedSemester + 1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Navigation arrow button
+  Widget _buildNavigationArrow({required IconData icon, VoidCallback? onTap}) {
+    return Container(
+      width: 40,
+      height: 40,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Icon(
+            icon,
+            color: onTap != null ? Colors.white : Colors.white.withOpacity(0.5),
+            size: 24,
           ),
         ),
       ),
     );
   }
 
-  // Helper method to get subjects for the selected semester
-  List<SubjectData> _getSubjectsForSelectedSemester() {
-    if (_studentData == null) return [];
+  // Individual semester button
+  Widget _buildSemesterButton(int semester, bool isDark) {
+    final isSelected = _selectedSemester == semester;
     
-    // Find the semester that matches the selected semester number
-    final selectedSemesterData = _studentData!.semesters.firstWhere(
-      (sem) => sem.semesterNumber == _selectedSemester,
-      orElse: () => _studentData!.semesters.isNotEmpty ? _studentData!.semesters.first : SemesterData(
-        semesterId: 0,
-        semesterNumber: 0,
-        startDate: '',
-        endDate: '',
-        subjects: [],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () => _changeSemester(semester),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? const LinearGradient(
+                      colors: [Color(0xFF03A9F4), Color(0xFF0288D1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : Colors.white.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: isSelected 
+                    ? Colors.white.withOpacity(0.0)
+                    : Colors.white.withOpacity(0.25),
+                width: 1.5,
+              ),
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: const Color(0xFF03A9F4).withOpacity(0.25),
+                  blurRadius: 8,
+                  spreadRadius: 0.5,
+                  offset: const Offset(0, 3),
+                ),
+              ] : null,
+            ),
+            child: Center(
+              child: Text(
+                'Sem $semester',
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.95),
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 14,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
-    
-    return selectedSemesterData.subjects;
   }
-  
-  // Widget for loading state
-  Widget _buildLoadingIndicator() {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(color: Color(0xFF03A9F4)),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading your subjects...',
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.white : Colors.black,
+
+  // Change semester with animation
+  void _changeSemester(int semester) {
+    if (_selectedSemester != semester) {
+      setState(() {
+        _selectedSemester = semester;
+      });
+      
+      // Animate page change
+      _pageController.animateToPage(
+        semester - 1,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      
+      // Auto-scroll semester buttons to center
+      _scrollToSelectedSemester();
+    }
+  }
+
+  // Auto-scroll to center selected semester
+  void _scrollToSelectedSemester() {
+    if (_studentData != null) {
+      final index = _selectedSemester - 1;
+      final itemWidth = 100.0; // Approximate width of each button
+      final screenWidth = MediaQuery.of(context).size.width;
+      final scrollOffset = (index * itemWidth) - (screenWidth / 2) + (itemWidth / 2);
+      
+      _semesterScrollController.animateTo(
+        scrollOffset.clamp(0.0, _semesterScrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  // Subject content with PageView
+  Widget _buildSubjectContent(bool isDark) {
+    if (_isLoading) {
+      return _buildLoadingIndicator();
+    }
+    
+    if (_error != null) {
+      return _buildErrorMessage();
+    }
+    
+    if (_studentData == null || _studentData!.semesters.isEmpty) {
+      return _buildNoDataMessage();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        child: PageView.builder(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() {
+              _selectedSemester = index + 1;
+            });
+          },
+          itemCount: _studentData!.semesters.length,
+          itemBuilder: (context, index) {
+            final semesterData = _studentData!.semesters[index];
+            final performanceData = _allSemesterData[semesterData.semesterNumber];
+            
+            return _buildSemesterSubjects(semesterData, performanceData, isDark);
+          },
+        ),
+      ),
+    );
+  }
+
+  // Build subjects for a semester
+  Widget _buildSemesterSubjects(SemesterData semesterData, StudentPerformanceModel? performanceData, bool isDark) {
+    final subjects = performanceData?.subjects ?? [];
+    final fallbackSubjects = semesterData.subjects;
+    
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: subjects.isNotEmpty ? subjects.length : fallbackSubjects.length,
+        itemBuilder: (context, index) {
+          if (subjects.isNotEmpty) {
+            return _buildModernSubjectCard(subjects[index], isDark, index);
+          } else {
+            return _buildFallbackSubjectCard(fallbackSubjects[index], isDark, index);
+          }
+        },
+      ),
+    );
+  }
+
+  // Modern subject card with animations
+  Widget _buildModernSubjectCard(SubjectPerformance subject, bool isDark, int index) {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _controller,
+        curve: Interval(index * 0.1, 1.0, curve: Curves.easeOut),
+      )),
+      child: GlassCard(
+        margin: const EdgeInsets.only(bottom: 16),
+        borderRadius: 20,
+        padding: const EdgeInsets.all(20),
+        onTap: () => _navigateToSubjectDetail(subject),
+        child: Row(
+                    children: [
+                      // Grade circle
+                      _buildGradeCircle(subject.grade, isDark),
+                      const SizedBox(width: 16),
+                      // Subject info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              subject.subject,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subject.code,
+                              style: TextStyle(
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Progress bar
+                            _buildProgressBar(subject.percentage, isDark),
+                          ],
+                        ),
+                      ),
+                      // Arrow
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        size: 16,
+                      ),
+                    ],
                   ),
+      ),
+      );
+  }
+
+  // Grade circle widget
+  Widget _buildGradeCircle(String grade, bool isDark) {
+    Color gradeColor = _getGradeColor(grade);
+    
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [gradeColor, gradeColor.withOpacity(0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: gradeColor.withOpacity(0.18),
+            blurRadius: 6,
+            spreadRadius: 0.5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          grade,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Progress bar widget
+  Widget _buildProgressBar(double percentage, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Progress',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+            Text(
+              '${percentage.toStringAsFixed(1)}%',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 6,
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[700] : Colors.grey[300],
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: percentage / 100,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_getGradeColor(_getGradeFromPercentage(percentage)), _getGradeColor(_getGradeFromPercentage(percentage)).withOpacity(0.7)],
                 ),
-              ],
+                borderRadius: BorderRadius.circular(3),
+              ),
             ),
           ),
         ),
       ],
     );
   }
-  
-  // Widget for error state
-  Widget _buildErrorMessage() {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
-      children: [
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 60,
-                color: Colors.red.withOpacity(0.8),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Failed to load subjects',
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white : Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error ?? 'Unknown error occurred',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _fetchStudentData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF03A9F4),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Try Again'),
-              ),
-            ],
+
+  // Get grade color
+  Color _getGradeColor(String grade) {
+    switch (grade.toUpperCase()) {
+      case 'A+': case 'O': return const Color(0xFF4CAF50);
+      case 'A': return const Color(0xFF8BC34A);
+      case 'B+': return const Color(0xFFCDDC39);
+      case 'B': return const Color(0xFFFFEB3B);
+      case 'C+': return const Color(0xFFFF9800);
+      case 'C': return const Color(0xFFFF5722);
+      case 'D': return const Color(0xFFE91E63);
+      case 'F': case 'FF': return const Color(0xFFF44336);
+      default: return Colors.grey;
+    }
+  }
+
+  // Get grade from percentage
+  String _getGradeFromPercentage(double percentage) {
+    if (percentage >= 90) return 'A+';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B+';
+    if (percentage >= 60) return 'B';
+    if (percentage >= 50) return 'C';
+    return 'F';
+  }
+
+  // Navigate to subject detail
+  void _navigateToSubjectDetail(SubjectPerformance subject) {
+    final Map<String, dynamic> components = {};
+    subject.components.forEach((componentType, componentData) {
+      components[componentType.toUpperCase()] = {
+        'marks': componentData.marksObtained,
+        'outOf': componentData.totalMarks
+      };
+    });
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SubjectDetailScreen(
+          subject: Subject(
+            name: subject.subject,
+            code: subject.code,
+            status: subject.grade == 'F' ? 'Failed' : 'Passed',
+            grade: subject.grade,
+            components: components,
           ),
         ),
-      ],
+      ),
     );
   }
-  
-  // Widget for performance subjects list (new API)
-  Widget _buildPerformanceSubjectsList() {
-    if (_performanceData == null || _performanceData!.subjects.isEmpty) {
-      return _buildNoDataMessage();
+
+  // Fallback subject card
+  Widget _buildFallbackSubjectCard(SubjectData subject, bool isDark, int index) {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _controller,
+        curve: Interval(index * 0.1, 1.0, curve: Curves.easeOut),
+      )),
+      child: GlassCard(
+        margin: const EdgeInsets.only(bottom: 16),
+        borderRadius: 20,
+        padding: const EdgeInsets.all(20),
+        onTap: () => _navigateToFallbackSubjectDetail(subject),
+        child: Row(
+                    children: [
+                      // Grade circle
+                      _buildGradeCircle(subject.grades ?? 'NA', isDark),
+                      const SizedBox(width: 16),
+                      // Subject info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              subject.subjectName,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subject.subjectCode ?? 'N/A',
+                              style: TextStyle(
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Arrow
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+  }
+
+  // Navigate to fallback subject detail
+  void _navigateToFallbackSubjectDetail(SubjectData subject) {
+    final Map<String, dynamic> components = {};
+    if (subject.componentMarks != null) {
+      final marks = subject.componentMarks!;
+      if (marks.ese != null) components['ESE'] = {'marks': marks.ese!, 'outOf': 50.0};
+      if (marks.ia != null) components['IA'] = {'marks': marks.ia!, 'outOf': 25.0};
+      if (marks.tw != null) components['TW'] = {'marks': marks.tw!, 'outOf': 25.0};
+      if (marks.viva != null) components['VIVA'] = {'marks': marks.viva!, 'outOf': 15.0};
+      if (marks.cse != null) components['CSE'] = {'marks': marks.cse!, 'outOf': 15.0};
     }
-    
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _performanceData!.subjects.length,
-      itemBuilder: (context, index) {
-        final subject = _performanceData!.subjects[index];
-        return _buildPerformanceSubjectCard(subject, context);
-      },
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SubjectDetailScreen(
+          subject: Subject(
+            name: subject.subjectName,
+            code: subject.subjectCode ?? 'N/A',
+            status: subject.grades == 'F' ? 'Failed' : 'Passed',
+            grade: subject.grades ?? 'NA',
+            components: components,
+          ),
+        ),
+      ),
     );
   }
-  
-  // Build subject card from performance API data
+
+  // Widget for loading state
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: Color(0xFF667eea)),
+          const SizedBox(height: 16),
+          Text(
+            'Loading your subjects...',
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white : Colors.black,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // Widget for error state
+  Widget _buildErrorMessage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 60,
+            color: Colors.red.withOpacity(0.7),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading subjects',
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white : Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _error ?? 'An unexpected error occurred',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _fetchStudentData,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget for no data state
+  Widget _buildNoDataMessage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.folder_open,
+            size: 60,
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No subjects found',
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white : Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'There are no subjects available',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build subject card from performance API data (legacy method - keeping for compatibility)
   Widget _buildPerformanceSubjectCard(SubjectPerformance subject, BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Determine grade color
     Color gradeColor = Colors.grey;
     final grade = subject.grade;
-    
+
     if (grade == 'A+' || grade == 'A' || grade == 'O') {
       gradeColor = Colors.green;
     } else if (grade == 'B+' || grade == 'B') {
@@ -604,7 +1016,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     } else if (grade == 'F' || grade == 'FF') {
       gradeColor = Colors.red;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
@@ -617,7 +1029,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
               'outOf': componentData.totalMarks
             };
           });
-          
+
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -744,48 +1156,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     );
   }
   
-  // Widget for no data state
-  Widget _buildNoDataMessage() {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
-      children: [
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.folder_open,
-                size: 60,
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No subjects found',
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white : Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'There are no subjects available for this semester',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // (Removed duplicate _buildErrorMessage and _buildNoDataMessage definitions here)
 
   // Build subject card from API data
   Widget _buildSubjectCardFromApiData(SubjectData subject, BuildContext context) {

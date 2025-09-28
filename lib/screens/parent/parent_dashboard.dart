@@ -3,767 +3,792 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:convert';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
-import 'parent_profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../providers/user_provider.dart';
-import '../../models/student_ranking_model.dart';
+import 'package:http/http.dart' as http;
+import '../../../providers/user_provider.dart';
+import '../../../services/academic_service.dart';
 import '../../utils/api_config.dart';
-import 'parent_academic_monitoring.dart';
-import 'parent_communication.dart';
+import '../main_navigation.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
-  
-  const ParentDashboardScreen({super.key, required this.toggleTheme});
+
+  const ParentDashboardScreen({Key? key, required this.toggleTheme}) : super(key: key);
 
   @override
   _ParentDashboardScreenState createState() => _ParentDashboardScreenState();
 }
 
-class _ParentDashboardScreenState extends State<ParentDashboardScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _scaleAnimation;
-
-  String _studentName = 'Student';
-  String _parentName = 'Parent';
-  String? _enrollmentNumber;
+class _ParentDashboardScreenState extends State<ParentDashboardScreen>
+    with TickerProviderStateMixin {
+  
+  // Loading states
   bool _isLoading = true;
-  String? _error;
+  
+  // User data
+  String _userName = '';
+  String _studentName = '';
+  String _enrollmentNumber = '';
+  int? _currentSemester;
+  String? _batch;
+  String _dailyQuote = 'Education is the most powerful weapon which you can use to change the world.';
+  
+  // Academic data
+  Map<String, dynamic> _academicData = {};
+  
+  // Activity data
+  List<Map<String, dynamic>> _recentActivities = [];
+  
+  // Animation controllers
+  late AnimationController _graphAnimationController;
+  late PageController _subjectPageController;
 
-  // Real academic data from API
-  Map<String, dynamic>? _academicData;
-  List<dynamic> _recentActivities = [];
-  Map<String, dynamic>? _currentSemesterData;
-  List<Map<String, dynamic>> _gradeAlerts = [];
-  int _totalCocurricularPoints = 0;
-  int _totalExtracurricularPoints = 0;
-
-  // Pull-to-refresh handler to reload all data shown on the dashboard
-  Future<void> _onRefresh() async {
-    try {
-      await _loadUserData();
-    } catch (e) {
-      debugPrint('Parent dashboard refresh failed: $e');
-    }
+  @override
+  void initState() {
+    super.initState();
+    _graphAnimationController = AnimationController(
+      duration: Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _subjectPageController = PageController();
+    _loadData();
   }
 
-
-  // Career Goals and Pathways
-  final List<Map<String, dynamic>> _careerGoals = [
-    {
-      'title': 'Technical Skills',
-      'description': 'Programming & Development',
-      'icon': Icons.code,
-      'color': Colors.blue,
-      'currentLevel': 'Intermediate',
-      'targetLevel': 'Advanced',
-    },
-    {
-      'title': 'Industry Readiness',
-      'description': 'Internships & Projects',
-      'icon': Icons.work,
-      'color': Colors.green,
-      'currentLevel': 'Developing',
-      'targetLevel': 'Industry Ready',
-    },
-    {
-      'title': 'Leadership Skills',
-      'description': 'Club Activities & Events',
-      'icon': Icons.groups,
-      'color': Colors.orange,
-      'currentLevel': 'Participating',
-      'targetLevel': 'Leading',
-    },
-    {
-      'title': 'Academic Excellence',
-      'description': 'Maintain High CPI/SPI',
-      'icon': Icons.school,
-      'color': Colors.purple,
-      'currentLevel': 'Good',
-      'targetLevel': 'Excellent',
-    },
-  ];
-
-
-  Future<void> _loadUserData() async {
+  Future<void> _loadData() async {
     try {
       setState(() {
         _isLoading = true;
-        _error = null;
       });
 
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final user = userProvider.user;
-      
+
       if (user != null) {
         setState(() {
+          _userName = user.name;
           _studentName = user.name;
           _enrollmentNumber = user.enrollmentNumber;
-          _parentName = "${user.name}'s Parent";
+          _currentSemester = user.currentSemester;
+          _batch = user.batch;
         });
-        
+
         // Load academic data
-        await _loadAcademicData(user.email);
+        final academicService = AcademicService();
+        final academicData = await academicService.getAcademicDataByEmail(user.email);
         
-        // Load activity data
-        await _loadActivityData(user.enrollmentNumber);
+        setState(() {
+          _academicData = {
+            'cpi': academicData.latestCPI,
+            'spi': academicData.latestSPI,
+            'semester': academicData.currentSemester,
+            'rank': academicData.latestRank,
+          };
+        });
+
+        // Fetch activities
+        await _fetchActivities();
+      }
+      
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      print('Error loading data: $e');
+    }
+  }
+
+  Future<void> _fetchActivities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token == null) return;
+
+      print('Fetching activities for enrollment number: $_enrollmentNumber');
+
+      // Use the same approach as parent_activities_screen.dart
+      // First get all semesters' activities
+      final allResponse = await http.post(
+        Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'enrollmentNumber': _enrollmentNumber,
+          'semester': 'all'
+        }),
+      );
+
+      print('All semesters response status: ${allResponse.statusCode}');
+      print('All semesters response body: ${allResponse.body}');
+
+      if (allResponse.statusCode == 200) {
+        final data = json.decode(allResponse.body);
         
-        // Load current semester subjects for grade alerts
-        await _loadCurrentSemesterData(user.email);
-      } else {
-        // Fallback to SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
-        final userData = prefs.getString('userData');
-        
-        if (userData != null) {
-          final decodedData = json.decode(userData);
-          setState(() {
-            _studentName = decodedData['name'] ?? 'Student';
-            _enrollmentNumber = decodedData['enrollmentNumber'];
-            _parentName = "$_studentName's Parent";
-          });
+        if (data is List && data.isNotEmpty) {
+          // Extract event IDs from the response
+          Set<String> eventIds = {};
           
-          final email = decodedData['email'];
-          if (email != null) {
-            await _loadAcademicData(email);
-            await _loadActivityData(_enrollmentNumber!);
-            await _loadCurrentSemesterData(email);
+          for (var item in data) {
+            // Extract event IDs (CSV format)
+            if (item['eventId'] != null) {
+              final ids = item['eventId'].toString().split(',').map((id) => id.trim()).where((id) => id.isNotEmpty);
+              eventIds.addAll(ids);
+            }
           }
-        }
-      }
-      
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading user data: $e');
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadAcademicData(String email) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      
-      if (token != null) {
-        final response = await http.post(
-          Uri.parse('${ApiConfig.baseUrl}/academic/getAcademicDataByEmail'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: json.encode({'email': email}),
-        );
-        
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          setState(() {
-            _academicData = {
-              'currentSemester': data['currentSemester'] ?? 6,
-              'latestCPI': data['latestCPI'] ?? 0.0,
-              'latestSPI': data['latestSPI'] ?? 0.0,
-              'currentRank': data['latestRank'] ?? 0,
-              'enrollmentNumber': data['enrollmentNumber'] ?? '',
-            };
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading academic data: $e');
-    }
-  }
-
-  Future<void> _loadActivityData(String enrollmentNumber) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      
-      if (token != null) {
-        // Get total activity points
-        final pointsResponse = await http.post(
-          Uri.parse('${ApiConfig.baseUrl}/events/fetchTotalActivityPoints'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: json.encode({
-            'enrollmentNumber': enrollmentNumber,
-          }),
-        );
-        
-        if (pointsResponse.statusCode == 200) {
-          final pointsData = json.decode(pointsResponse.body);
-          setState(() {
-            _totalCocurricularPoints = pointsData['totalCocurricular'] ?? 0;
-            _totalExtracurricularPoints = pointsData['totalExtracurricular'] ?? 0;
-          });
-        }
-        
-        // Get recent activities
-        final activitiesResponse = await http.post(
-          Uri.parse('${ApiConfig.baseUrl}/events/fetchEventsbyEnrollandSemester'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: json.encode({
-            'enrollmentNumber': enrollmentNumber,
-            'semester': 'all'
-          }),
-        );
-        
-        if (activitiesResponse.statusCode == 200) {
-          final data = json.decode(activitiesResponse.body);
-          if (data is List) {
-            setState(() {
-              _recentActivities = data.take(3).toList(); // Get last 3 activities
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading activity data: $e');
-    }
-  }
-
-  Future<void> _loadCurrentSemesterData(String email) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      
-      if (token != null) {
-        final response = await http.post(
-          Uri.parse('${ApiConfig.baseUrl}/student/getStudentComponentMarksAndSubjects'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: json.encode({'email': email}),
-        );
-        
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data != null && data.containsKey('semesters')) {
-            final List<dynamic> semesters = data['semesters'];
-            if (semesters.isNotEmpty) {
-              // Get current semester (highest semester number)
-              Map<String, dynamic>? currentSemester;
-              int highestSemester = 0;
+          
+          print('Extracted event IDs: $eventIds');
+          
+          if (eventIds.isNotEmpty) {
+            // Convert to comma-separated string as required by the API
+            final eventIdsString = eventIds.join(',');
+            print('Sending event IDs as string: $eventIdsString');
+            
+            // Fetch event details from EventMaster table
+            final eventDetailsResponse = await http.post(
+              Uri.parse(ApiConfig.getUrl('events/fetchEventsByIds')),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'eventIds': eventIdsString
+              }),
+            );
+            
+            print('Event details response: ${eventDetailsResponse.body}');
+            
+            if (eventDetailsResponse.statusCode == 200) {
+              final eventDetailsData = json.decode(eventDetailsResponse.body);
               
-              for (var semester in semesters) {
-                final semesterNumber = int.tryParse(semester['semesterNumber'].toString()) ?? 0;
-                if (semesterNumber > highestSemester) {
-                  highestSemester = semesterNumber;
-                  currentSemester = semester;
+              if (eventDetailsData['success'] == true && eventDetailsData['data'] is List) {
+                List<Map<String, dynamic>> activities = [];
+                
+                // Process event details and create activity list
+                for (var event in eventDetailsData['data']) {
+                  
+                  // Get individual event points from the event master table
+                  final eventType = (event['eventType'] ?? event['Event_Type'] ?? 'unknown').toString().toLowerCase();
+                  int eventCocurricularPoints = 0;
+                  int eventExtracurricularPoints = 0;
+                  String activityType = 'general';
+                  
+                  // Determine points based on event type
+                  if (eventType.contains('co-curricular') || eventType.contains('cocurricular')) {
+                    eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                    activityType = 'co-curricular';
+                  } else if (eventType.contains('extra-curricular') || eventType.contains('extracurricular')) {
+                    eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                    activityType = 'extra-curricular';
+                  } else {
+                    // If type is unclear, try to get both
+                    eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? '0');
+                    eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? '0');
+                    
+                    // If both are 0, use general points field
+                    if (eventCocurricularPoints == 0 && eventExtracurricularPoints == 0) {
+                      final generalPoints = int.parse(event['points']?.toString() ?? '0');
+                      if (eventType.contains('co') || eventType.contains('technical') || eventType.contains('academic')) {
+                        eventCocurricularPoints = generalPoints;
+                        activityType = 'co-curricular';
+                      } else {
+                        eventExtracurricularPoints = generalPoints;
+                        activityType = 'extra-curricular';
+                      }
+                    } else if (eventCocurricularPoints > 0) {
+                      activityType = 'co-curricular';
+                    } else if (eventExtracurricularPoints > 0) {
+                      activityType = 'extra-curricular';
+                    }
+                  }
+                  
+                  // Use the individual event points for display
+                  int displayPoints = eventCocurricularPoints > 0 ? eventCocurricularPoints : eventExtracurricularPoints;
+                  
+                  activities.add({
+                    'title': event['eventName'] ?? event['Event_Name'] ?? 'Activity',
+                    'date': event['eventDate'] ?? event['Event_Date'] ?? 'No date',
+                    'type': activityType,
+                    'points': displayPoints,
+                    'description': event['description'] ?? event['Description'] ?? '',
+                    'venue': event['eventVenue'] ?? event['venue'] ?? '',
+                    'participationType': event['participationType'] ?? event['position'] ?? 'Participant',
+                  });
                 }
-              }
-              
-              if (currentSemester != null) {
-                setState(() {
-                  _currentSemesterData = currentSemester;
-                  _generateGradeAlerts(currentSemester!);
+                
+                // Sort by date (most recent first) and take only 5
+                activities.sort((a, b) {
+                  try {
+                    DateTime dateA = DateTime.parse(a['date']);
+                    DateTime dateB = DateTime.parse(b['date']);
+                    return dateB.compareTo(dateA);
+                  } catch (e) {
+                    return 0;
+                  }
                 });
+                
+                setState(() {
+                  _recentActivities = activities.take(5).toList();
+                });
+                
+                print('Successfully loaded ${_recentActivities.length} recent activities');
               }
             }
           }
         }
       }
     } catch (e) {
-      debugPrint('Error loading current semester data: $e');
+      print('Error fetching activities: $e');
     }
-  }
-
-  void _generateGradeAlerts(Map<String, dynamic> semesterData) {
-    final List<Map<String, dynamic>> alerts = [];
-    
-    if (semesterData.containsKey('subjects')) {
-      final List<dynamic> subjects = semesterData['subjects'];
-      
-      for (var subject in subjects) {
-        final String subjectName = subject['subjectName'] ?? 'Unknown';
-        final String grade = subject['grade'] ?? 'NA';
-        
-        // Check for low grades
-        if (grade == 'C' || grade == 'D' || grade == 'F' || grade == 'FF') {
-          alerts.add({
-            'type': 'warning',
-            'title': 'Low Grade Alert',
-            'message': '$subjectName: Grade $grade needs attention',
-            'color': Colors.orange,
-            'icon': Icons.warning,
-          });
-        }
-        
-        // Check for excellent performance
-        if (grade == 'A+' || grade == 'O') {
-          alerts.add({
-            'type': 'success',
-            'title': 'Excellent Performance',
-            'message': '$subjectName: Outstanding grade $grade!',
-            'color': Colors.green,
-            'icon': Icons.star,
-          });
-        }
-      }
-    }
-    
-    setState(() {
-      _gradeAlerts = alerts;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
-    );
-
-    _animationController.forward();
-    _loadUserData();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _graphAnimationController.dispose();
+    _subjectPageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : Colors.white,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
       body: Stack(
         children: [
           // Gradient background
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF03A9F4),
-                  Colors.black,
+                  const Color(0xFF03A9F4),
+                  Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
                 ],
-                stops: [0.0, 0.4],
+                stops: const [0.0, 0.3],
               ),
             ),
           ),
           // Content
           SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: RefreshIndicator(
-                onRefresh: _onRefresh,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Welcome message and profile icon
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Welcome back,',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                _parentName,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Monitoring $_studentName\'s progress',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => ParentProfileScreen(
-                                    toggleTheme: widget.toggleTheme,
-                                    isDarkMode: isDark,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: const CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.white24,
-                                child: Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 24),
-                    
-                    if (_isLoading)
-                      const Center(
-                        child: Column(
-                          children: [
-                            CircularProgressIndicator(color: Color(0xFF03A9F4)),
-                            SizedBox(height: 16),
-                            Text(
-                              'Loading student data...',
-                              style: TextStyle(
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else if (_error != null)
-                      _buildErrorWidget(isDark)
-                    else
-                      Column(
-                        children: [
-                          // Grade Alerts Card (if any)
-                          if (_gradeAlerts.isNotEmpty) ...[
-                            SlideTransition(
-                              position: _slideAnimation,
-                              child: ScaleTransition(
-                                scale: _scaleAnimation,
-                                child: _buildGradeAlertsCard(isDark),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          
-                          // Academic Summary Card
-                          SlideTransition(
-                            position: _slideAnimation,
-                            child: ScaleTransition(
-                              scale: _scaleAnimation,
-                              child: _buildAcademicSummaryCard(isDark),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Career Goals Card
-                          SlideTransition(
-                            position: _slideAnimation,
-                            child: ScaleTransition(
-                              scale: _scaleAnimation,
-                              child: _buildCareerGoalsCard(isDark),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Recent Activities Card
-                          if (_recentActivities.isNotEmpty) ...[
-                            SlideTransition(
-                              position: _slideAnimation,
-                              child: ScaleTransition(
-                                scale: _scaleAnimation,
-                                child: _buildRecentActivitiesCard(isDark),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          
-                          // Student Progress Overview
-                          SlideTransition(
-                            position: _slideAnimation,
-                            child: ScaleTransition(
-                              scale: _scaleAnimation,
-                              child: _buildProgressOverviewCard(isDark),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Quick Actions Card
-                          SlideTransition(
-                            position: _slideAnimation,
-                            child: ScaleTransition(
-                              scale: _scaleAnimation,
-                              child: _buildQuickActionsCard(isDark),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(bool isDark) {
-    return _buildGlassCard(
-      title: 'Error Loading Data',
-      icon: Icons.error_outline,
-      child: Column(
-        children: [
-          const Icon(
-            Icons.error_outline,
-            size: 48,
-            color: Colors.red,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Unable to load student data. Please check your connection and try again.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isDark ? Colors.white70 : Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadUserData,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF03A9F4),
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Retry'),
-          ),
-        ],
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildGradeAlertsCard(bool isDark) {
-    return _buildGlassCard(
-      title: 'Grade Alerts',
-      icon: Icons.notifications_active,
-      child: Column(
-        children: _gradeAlerts.map((alert) => _buildAlertItem(alert, isDark)).toList(),
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildAlertItem(Map<String, dynamic> alert, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: (alert['color'] as Color).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: (alert['color'] as Color).withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            alert['icon'],
-            color: alert['color'],
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  alert['title'],
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
-                ),
-                Text(
-                  alert['message'],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAcademicSummaryCard(bool isDark) {
-    final academicData = _academicData ?? {};
-    return _buildGlassCard(
-      title: 'Academic Summary', // $_studentName\'s
-      icon: Icons.school,
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildSummaryItem('Current CPI', '${academicData['latestCPI'] ?? 'N/A'}', Colors.blue, isDark),
-              _buildSummaryItem('Current SPI', '${academicData['latestSPI'] ?? 'N/A'}', Colors.green, isDark),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildSummaryItem('Class Rank', '${academicData['currentRank'] ?? 'N/A'}', Colors.orange, isDark),
-              _buildSummaryItem('Semester', '${academicData['currentSemester'] ?? 'N/A'}', Colors.purple, isDark),
-            ],
-          ),
-        ],
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildCareerGoalsCard(bool isDark) {
-    return _buildGlassCard(
-      title: 'Career Development Goals',
-      icon: Icons.flag,
-      child: Column(
-        children: _careerGoals.map((goal) => _buildCareerGoalItem(goal, isDark)).toList(),
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildCareerGoalItem(Map<String, dynamic> goal, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: (goal['color'] as Color).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: (goal['color'] as Color).withOpacity(0.2),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (goal['color'] as Color).withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                goal['icon'],
-                color: goal['color'],
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    goal['title'],
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  Text(
-                    goal['description'],
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? Colors.white70 : Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                  // Header with welcome message and 3-dot menu
                   Row(
                     children: [
-                      Text(
-                        'Current: ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.white60 : Colors.black45,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome back!',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (_studentName.isNotEmpty)
+                              Text(
+                                "${_studentName}'s Parents",
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            SizedBox(height: 4),
+                            Text(
+                              _dailyQuote,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                                fontStyle: FontStyle.italic,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        goal['currentLevel'],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: goal['color'],
-                        ),
-                      ),
-                      Text(
-                        ' → Target: ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.white60 : Colors.black45,
-                        ),
-                      ),
-                      Text(
-                        goal['targetLevel'],
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
+                      Container(
+                        margin: EdgeInsets.only(top: 8, right: 8),
+                        alignment: Alignment.topRight,
+                        child: PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_vert,
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'theme') {
+                              widget.toggleTheme();
+                            } else if (value == 'about') {
+                              _showAboutDialog(context);
+                            } else if (value == 'logout') {
+                              _showLogoutDialog(context);
+                            } else if (value == 'report') {
+                              _showReportIssueDialog(context);
+                            }
+                          },
+                          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(
+                              value: 'theme',
+                              child: ListTile(
+                                leading: Icon(Icons.brightness_6),
+                                title: Text('Change Theme'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'about',
+                              child: ListTile(
+                                leading: Icon(Icons.info),
+                                title: Text('About'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'report',
+                              child: ListTile(
+                                leading: Icon(Icons.bug_report),
+                                title: Text('Report an Issue'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'logout',
+                              child: ListTile(
+                                leading: Icon(Icons.logout),
+                                title: Text('Logout'),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                  SizedBox(height: 24),
+                  
+                  if (_isLoading)
+                    Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 100),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else ...[
+                    _buildAcademicSummary(),
+                    SizedBox(height: 16),
+                    _buildRecentActivities(),
+                    SizedBox(height: 16),
+                    _buildQuickActions(),
+                  ],
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassmorphicCard({required Widget child}) {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            padding: EdgeInsets.all(16),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAcademicSummary() {
+    return _buildGlassmorphicCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Academic Summary',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryItem(
+                  'Current CPI',
+                  _academicData['cpi']?.toString() ?? 'N/A',
+                  Icons.school,
+                  Colors.blue,
+                ),
+              ),
+              Expanded(
+                child: _buildSummaryItem(
+                  'Current SPI',
+                  _academicData['spi']?.toString() ?? 'N/A',
+                  Icons.grade,
+                  Colors.green,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryItem(
+                  'Semester',
+                  _academicData['semester']?.toString() ?? 'N/A',
+                  Icons.calendar_today,
+                  Colors.orange,
+                ),
+              ),
+              Expanded(
+                child: _buildSummaryItem(
+                  'Rank',
+                  _academicData['rank']?.toString() ?? 'N/A',
+                  Icons.emoji_events,
+                  Colors.purple,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: EdgeInsets.all(8),
+      margin: EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+          ),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentActivities() {
+    return _buildGlassmorphicCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recent Activities',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+          ),
+          SizedBox(height: 16),
+          _recentActivities.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'No recent activities',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  itemCount: _recentActivities.length,
+                  itemBuilder: (context, index) {
+                    final activity = _recentActivities[index];
+                    final bool isCoCurricular = activity['type'] == 'co-curricular';
+                    final Color activityColor = isCoCurricular ? Colors.blue : Colors.orange;
+                    
+                    return GestureDetector(
+                      onTap: () {
+                        // Navigate to activities tab (index 2 for parent)
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MainNavigation(
+                              toggleTheme: widget.toggleTheme,
+                              initialTabIndex: 2,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              activityColor.withOpacity(0.1),
+                              Colors.white.withOpacity(0.05),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: activityColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: activityColor.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: activityColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: activityColor.withOpacity(0.4),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                isCoCurricular ? Icons.school : Icons.sports,
+                                color: activityColor,
+                                size: 20,
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    activity['title'] ?? 'Activity',
+                                    style: TextStyle(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today,
+                                        size: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        _formatDate(activity['date'] ?? 'No date'),
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (activity['venue'] != null && activity['venue'].toString().isNotEmpty) ...[
+                                    SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                        SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            activity['venue'],
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            Column(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Colors.green, Colors.green.shade400],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.green.withOpacity(0.3),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    '+${activity['points']}',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'points',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      if (dateString == 'No date') return dateString;
+      
+      DateTime date = DateTime.parse(dateString);
+      List<String> months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  Widget _buildQuickActions() {
+    return _buildGlassmorphicCard(
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildActionButton(
+              'Contact CC',
+              Icons.phone,
+              Colors.green,
+              () {
+                _showContactCCDialog(context);
+              },
+            ),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: _buildActionButton(
+              'Contact HOD',
+              Icons.person,
+              Colors.purple,
+              () {
+                _showContactHODDialog(context);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 24),
+            SizedBox(height: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -771,696 +796,631 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> with Sing
     );
   }
 
-  Widget _buildRecentActivitiesCard(bool isDark) {
-    return _buildGlassCard(
-      title: 'Recent Activities',
-      icon: Icons.event_note,
-      child: Column(
-        children: [
-          if (_recentActivities.isEmpty)
-            Text(
-              'No recent activities found',
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
-            )
-          else
-            ..._recentActivities.map((activity) => _buildActivityItem(activity, isDark)),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildPointsItem('Co-curricular', _totalCocurricularPoints, Colors.blue, isDark),
-              _buildPointsItem('Extra-curricular', _totalExtracurricularPoints, Colors.green, isDark),
-            ],
-          ),
-        ],
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildActivityItem(Map<String, dynamic> activity, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.event,
-              color: Colors.blue,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  activity['eventName'] ?? 'Event',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
-                ),
-                Text(
-                  '${activity['points'] ?? 0} points • ${activity['eventDate'] ?? 'Date not available'}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPointsItem(String label, int points, Color color, bool isDark) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            points.toString(),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
+  void _showAboutDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.black : Colors.white,
+        title: Text(
+          'About',
           style: TextStyle(
-            fontSize: 10,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProgressOverviewCard(bool isDark) {
-    return _buildGlassCard(
-      title: 'Student Progress Overview',
-      icon: Icons.trending_up,
-      child: Column(
-        children: [
-          _buildProgressItem(
-            'Academic Performance',
-            _getAcademicPerformanceLevel(),
-            _getAcademicPerformanceColor(),
-            isDark,
-          ),
-          const SizedBox(height: 12),
-          _buildProgressItem(
-            'Activity Participation',
-            _getActivityParticipationLevel(),
-            _getActivityParticipationColor(),
-            isDark,
-          ),
-          const SizedBox(height: 12),
-          _buildProgressItem(
-            'Overall Development',
-            _getOverallDevelopmentLevel(),
-            _getOverallDevelopmentColor(),
-            isDark,
-          ),
-        ],
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildProgressItem(String title, String level, Color color, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
             color: isDark ? Colors.white : Colors.black,
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3)),
-          ),
-          child: Text(
-            level,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
+        content: Text(
+          'Parent Dashboard v1.0\n\nThis app helps parents monitor their child\'s academic progress and activities.',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black87,
           ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 
-  String _getAcademicPerformanceLevel() {
-    final cpi = _academicData?['latestCPI'] ?? 0.0;
-    if (cpi >= 9.0) return 'Excellent';
-    if (cpi >= 8.0) return 'Very Good';
-    if (cpi >= 7.0) return 'Good';
-    if (cpi >= 6.0) return 'Average';
-    return 'Needs Improvement';
-  }
-
-  Color _getAcademicPerformanceColor() {
-    final cpi = _academicData?['latestCPI'] ?? 0.0;
-    if (cpi >= 9.0) return Colors.green;
-    if (cpi >= 8.0) return Colors.lightGreen;
-    if (cpi >= 7.0) return Colors.orange;
-    if (cpi >= 6.0) return Colors.amber;
-    return Colors.red;
-  }
-
-  String _getActivityParticipationLevel() {
-    final totalPoints = _totalCocurricularPoints + _totalExtracurricularPoints;
-    if (totalPoints >= 100) return 'Highly Active';
-    if (totalPoints >= 50) return 'Active';
-    if (totalPoints >= 20) return 'Moderate';
-    if (totalPoints > 0) return 'Low';
-    return 'Inactive';
-  }
-
-  Color _getActivityParticipationColor() {
-    final totalPoints = _totalCocurricularPoints + _totalExtracurricularPoints;
-    if (totalPoints >= 100) return Colors.green;
-    if (totalPoints >= 50) return Colors.lightGreen;
-    if (totalPoints >= 20) return Colors.orange;
-    if (totalPoints > 0) return Colors.amber;
-    return Colors.red;
-  }
-
-  String _getOverallDevelopmentLevel() {
-    final academicLevel = _getAcademicPerformanceLevel();
-    final activityLevel = _getActivityParticipationLevel();
-    
-    if (academicLevel == 'Excellent' && (activityLevel == 'Highly Active' || activityLevel == 'Active')) {
-      return 'Outstanding';
-    }
-    if (academicLevel == 'Very Good' || academicLevel == 'Good') {
-      return 'Good Progress';
-    }
-    return 'Developing';
-  }
-
-  Color _getOverallDevelopmentColor() {
-    final level = _getOverallDevelopmentLevel();
-    if (level == 'Outstanding') return Colors.green;
-    if (level == 'Good Progress') return Colors.lightGreen;
-    return Colors.orange;
-  }
-
-
-  Widget _buildGlassCard({
-    required String title,
-    required IconData icon,
-    required Widget child,
-    required bool isDark,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2),
-              width: 1,
+  void _showReportIssueDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.bug_report,
+                color: Colors.orange,
+                size: 24,
+              ),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            const SizedBox(width: 12),
+            Text(
+              'Report an Issue',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF03A9F4),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 18,
-                        color: Colors.white,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.email,
+                          color: Colors.orange,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Contact Information',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'If you find any issue in the app, please send a screenshot to:',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black87,
+                        fontSize: 14,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.mail,
+                            color: Colors.orange,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'harshdoshiyt02@gmail.com',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.copy,
+                            color: Colors.orange.withOpacity(0.7),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: isDark ? Colors.blue[300] : Colors.blue[600],
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Please include a screenshot and describe the issue you encountered.',
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: isDark ? Colors.white70 : Colors.black54,
+            ),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Copy email to clipboard
+              Clipboard.setData(const ClipboardData(text: 'harshdoshiyt02@gmail.com'));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Email copied to clipboard!'),
+                  backgroundColor: Colors.orange,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Copy Email'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.black : Colors.white,
+        title: Text(
+          'Logout',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _logout();
+            },
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _logout() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      userProvider.clearUser();
+      
+      Navigator.of(context).pushReplacementNamed('/login');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logout failed: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showContactCCDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Always show Mitesh Solanki as CC
+    bool isCCAvailable = true;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.person, color: Colors.green, size: 24),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Contact CC',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: isCCAvailable ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.withOpacity(0.1), Colors.green.withOpacity(0.05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.green.withOpacity(0.2),
+                      child: Text(
+                        'MS',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12),
                     Text(
-                      title,
+                      'Mitesh Solanki',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : Colors.black,
                       ),
                     ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Class Coordinator',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                        SizedBox(width: 4),
+                        Text(
+                          '9586571164',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                child,
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(String label, String value, Color color, bool isDark) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGoalItem(Map<String, dynamic> goal, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: '9586571164'));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Phone number copied to clipboard'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.copy, size: 18),
+                      label: Text('Copy'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[600],
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _openWhatsApp('9586571164');
+                      },
+                      icon: Icon(Icons.chat, size: 18),
+                      label: Text('WhatsApp'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ) : Container(
+            padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: (goal['color'] as Color).withOpacity(0.2),
-              shape: BoxShape.circle,
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.withOpacity(0.3)),
             ),
-            child: Icon(
-              goal['icon'],
-              color: goal['color'],
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Icon(Icons.info_outline, color: Colors.orange, size: 48),
+                SizedBox(height: 12),
                 Text(
-                  goal['title'],
+                  'CC Not Available',
                   style: TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
+                SizedBox(height: 8),
                 Text(
-                  goal['description'],
+                  'Class Coordinator is only available for batches 22-26',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                LinearProgressIndicator(
-                  value: goal['progress'],
-                  backgroundColor: isDark ? Colors.white24 : Colors.black12,
-                  valueColor: AlwaysStoppedAnimation<Color>(goal['color']),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEventItem(Map<String, dynamic> event, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: (event['color'] as Color).withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              event['icon'],
-              color: event['color'],
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event['title'],
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
-                ),
-                Text(
-                  event['date'],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white70 : Colors.black54,
+                    fontSize: 14,
+                    color: Colors.grey[600],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsCard(bool isDark) {
-    return _buildGlassCard(
-      title: 'Quick Actions',
-      icon: Icons.dashboard,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  'Academic Monitor',
-                  Icons.school,
-                  Colors.blue,
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ParentAcademicMonitoringScreen(
-                        toggleTheme: widget.toggleTheme,
-                      ),
-                    ),
-                  ),
-                  isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionButton(
-                  'Communications',
-                  Icons.message,
-                  Colors.green,
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ParentCommunicationScreen(
-                        toggleTheme: widget.toggleTheme,
-                      ),
-                    ),
-                  ),
-                  isDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  'Monthly Reports',
-                  Icons.description,
-                  Colors.purple,
-                  () => _showReportsDialog(isDark),
-                  isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionButton(
-                  'Contact Faculty',
-                  Icons.contact_phone,
-                  Colors.orange,
-                  () => _showContactDialog(isDark),
-                  isDark,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildActionButton(
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-    bool isDark,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withOpacity(0.3),
           ),
         ),
-        child: Column(
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showContactHODDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final List<Map<String, String>> hods = [
+      {
+        'name': 'Chandrasinh Parmar',
+        'phone': '9824416484',
+        'initials': 'CP',
+      },
+      {
+        'name': 'Arjav Bavarva',
+        'phone': '7016685360',
+        'initials': 'AB',
+      },
+    ];
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                shape: BoxShape.circle,
+                color: Colors.purple.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
+              child: Icon(Icons.person_pin, color: Colors.purple, size: 24),
             ),
-            const SizedBox(height: 8),
+            SizedBox(width: 12),
             Text(
-              title,
-              textAlign: TextAlign.center,
+              'Contact HOD',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showReportsDialog(bool isDark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-        title: Text(
-          'Monthly Reports',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: hods.map((hod) => Container(
+              margin: EdgeInsets.only(bottom: 16),
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.purple.withOpacity(0.1), Colors.purple.withOpacity(0.05)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purple.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.purple.withOpacity(0.2),
+                        child: Text(
+                          hod['initials']!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hod['name']!,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Head of Department',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                                SizedBox(width: 4),
+                                Text(
+                                  hod['phone']!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: hod['phone']!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${hod['name']}\'s number copied'),
+                                backgroundColor: Colors.purple,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          icon: Icon(Icons.copy, size: 16),
+                          label: Text('Copy', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[600],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            _openWhatsApp(hod['phone']!);
+                          },
+                          icon: Icon(Icons.chat, size: 16),
+                          label: Text('WhatsApp', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )).toList(),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-              title: Text(
-                'January 2024 Report',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-              subtitle: Text(
-                'Monthly progress summary',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.download, color: Color(0xFF03A9F4)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Downloading January 2024 report...'),
-                      backgroundColor: Color(0xFF03A9F4),
-                    ),
-                  );
-                },
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-              title: Text(
-                'Semester Summary',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-              subtitle: Text(
-                'Complete semester analysis',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.download, color: Color(0xFF03A9F4)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Downloading semester summary...'),
-                      backgroundColor: Color(0xFF03A9F4),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text('Close'),
           ),
         ],
       ),
     );
   }
 
-  void _showContactDialog(bool isDark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-        title: Text(
-          'Contact Faculty',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.blue,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              title: Text(
-                'Dr. Sarah Johnson',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-              subtitle: Text(
-                'Mathematics Department\nHead of Department',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.email, color: Color(0xFF03A9F4)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Opening email to Dr. Sarah Johnson...'),
-                      backgroundColor: Color(0xFF03A9F4),
-                    ),
-                  );
-                },
-              ),
-            ),
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.green,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              title: Text(
-                'Prof. Michael Chen',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-              subtitle: Text(
-                'Physics Department\nClass Coordinator',
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.email, color: Color(0xFF03A9F4)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Opening email to Prof. Michael Chen...'),
-                      backgroundColor: Color(0xFF03A9F4),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+  void _openWhatsApp(String phoneNumber) {
+    // For now, we'll show a message that WhatsApp functionality would be implemented
+    // In a real app, you would use url_launcher to open WhatsApp
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Opening WhatsApp chat with $phoneNumber...'),
+        backgroundColor: Color(0xFF25D366),
+        duration: Duration(seconds: 2),
       ),
     );
   }

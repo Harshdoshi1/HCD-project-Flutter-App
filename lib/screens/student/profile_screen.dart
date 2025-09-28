@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +10,8 @@ import '../../providers/user_provider.dart';
 import '../../models/user_model.dart';
 import '../../services/academic_service.dart';
 import '../../services/student_service.dart';
+import '../../services/profile_service.dart';
 import '../splash_screen.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -29,11 +30,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late Animation<double> _fadeAnimation;
   User? _currentUser;
   File? _profileImage;
+  String? _profileImageUrl;
   AcademicData? _academicData;
   String? _academicError;
   
   // Student data
   final StudentService _studentService = StudentService();
+  final ProfileService _profileService = ProfileService();
   Map<String, dynamic>? _studentCPIData;
   bool _isLoadingStudentData = false;
   String? _studentDataError;
@@ -202,6 +205,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 widget.toggleTheme();
               } else if (value == 'about') {
                 _showAboutDialog(context);
+              } else if (value == 'report') {
+                _showReportIssueDialog(context);
               } else if (value == 'logout') {
                 showDialog(
                   context: context,
@@ -266,6 +271,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 child: ListTile(
                   leading: Icon(Icons.info),
                   title: Text('About'),
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'report',
+                child: ListTile(
+                  leading: Icon(Icons.bug_report),
+                  title: Text('Report an Issue'),
                 ),
               ),
               const PopupMenuItem<String>(
@@ -455,15 +467,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return Column(
       children: [
         GestureDetector(
-          onTap: _isEditing ? _changeProfilePicture : null,
+          onTap: _isEditing ? _pickImage : null,
+          onLongPress: _isEditing && (_profileImage != null || _profileImageUrl != null) ? _deleteProfileImage : null,
           child: Stack(
             alignment: Alignment.bottomRight,
             children: [
               CircleAvatar(
                 radius: 60,
                 backgroundColor: isDark ? Colors.grey[800] : Colors.white,
-                backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                child: _profileImage == null
+                backgroundImage: _profileImage != null 
+                    ? FileImage(_profileImage!) 
+                    : _profileImageUrl != null 
+                        ? NetworkImage(_profileImageUrl!) 
+                        : null,
+                child: _profileImage == null && _profileImageUrl == null
                     ? Icon(
                         Icons.person,
                         size: 60,
@@ -530,40 +547,123 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Future<void> _changeProfilePicture() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _profileImage = File(image.path);
-      });
-      // Save the profile image path
-      await _saveProfileImagePath(image.path);
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null && _currentUser?.email != null) {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        dynamic imageData;
+        if (kIsWeb) {
+          // For web: get bytes directly
+          imageData = await image.readAsBytes();
+        } else {
+          // For mobile: use File
+          imageData = File(image.path);
+        }
+
+        // Upload image to database
+        final result = await _profileService.uploadProfileImage(
+          _currentUser!.email,
+          imageData,
+        );
+
+        Navigator.pop(context); // Close loading dialog
+
+        if (result['imageUrl'] != null) {
+          setState(() {
+            if (!kIsWeb) {
+              _profileImage = File(image.path);
+            }
+            _profileImageUrl = result['imageUrl'];
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile image updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          throw Exception('Upload failed');
+        }
+      }
+    } catch (e) {
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop(); // Close loading dialog if open
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _loadProfileImage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final imagePath = prefs.getString('profile_image_path');
-      if (imagePath != null && !kIsWeb) {
-        final file = File(imagePath);
-        if (await file.exists()) {
-          setState(() {
-            _profileImage = file;
-          });
-        }
+      if (_currentUser?.email != null) {
+        final imageUrl = await _profileService.getProfileImageUrl(_currentUser!.email);
+        setState(() {
+          _profileImageUrl = imageUrl;
+        });
       }
     } catch (e) {
       debugPrint('Error loading profile image: $e');
     }
   }
 
-  Future<void> _saveProfileImagePath(String path) async {
+  Future<void> _deleteProfileImage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('profile_image_path', path);
+      if (_currentUser?.email != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        final success = await _profileService.deleteProfileImage(_currentUser!.email);
+        Navigator.pop(context); // Close loading dialog
+
+        if (success) {
+          setState(() {
+            _profileImage = null;
+            _profileImageUrl = null;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile image deleted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          throw Exception('Delete failed');
+        }
+      }
     } catch (e) {
-      debugPrint('Error saving profile image path: $e');
+      Navigator.of(context).pop(); // Close loading dialog if open
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Failed to delete image: $e'),
+            ],
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -861,6 +961,140 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showReportIssueDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context).colorScheme;
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark ? Colors.black12 : Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: theme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.bug_report,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Report an Issue',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'If you find any issue in the app, please send a screenshot to:',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black87,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: theme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: theme.primary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        'harshdoshiyt02@gmail.com',
+                        style: TextStyle(
+                          color: theme.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                          child: const Text('Close'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Clipboard.setData(const ClipboardData(text: 'harshdoshiyt02@gmail.com'));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Email copied to clipboard!'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Copy Email'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

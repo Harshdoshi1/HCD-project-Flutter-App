@@ -3,14 +3,13 @@ import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'student/dashboard.dart';
-import 'student/subjects_screen.dart';
+import 'student/subjects_screen.dart' as student_subjects;
 import 'student/rankings_screen.dart';
 import 'student/profile_screen.dart';
-import 'student/activities_screen.dart';
+import 'student/activities_screen.dart' as student;
 import 'parent/parent_dashboard.dart';
-import 'parent/parent_subjects_ranking.dart';
-import 'parent/parent_activities_screen.dart';
-import 'parent/parent_profile_screen.dart';
+import 'parent/parent_subjects_ranking_new.dart' as parent_subjects;
+import 'parent/parent_activities_screen.dart' as parent;
 import '../models/user_model.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -62,14 +61,13 @@ class _MainNavigationState extends State<MainNavigation> {
     // Role-based pages
     final List<Widget> pages = _isParent ? [
       ParentDashboardScreen(toggleTheme: widget.toggleTheme),
-      ParentSubjectsRankingScreen(toggleTheme: widget.toggleTheme),
-      ParentActivitiesScreen(toggleTheme: widget.toggleTheme),
-      ParentProfileScreen(toggleTheme: widget.toggleTheme, isDarkMode: isDark),
+      parent_subjects.SubjectsScreen(toggleTheme: widget.toggleTheme),
+      parent.ActivitiesScreen(toggleTheme: widget.toggleTheme),
     ] : [
       DashboardScreen(toggleTheme: widget.toggleTheme),
-      SubjectsScreen(toggleTheme: widget.toggleTheme),
+      student_subjects.SubjectsScreen(toggleTheme: widget.toggleTheme),
       RankingsScreen(toggleTheme: widget.toggleTheme),
-      ActivitiesScreen(toggleTheme: widget.toggleTheme),
+      student.ActivitiesScreen(toggleTheme: widget.toggleTheme),
       ProfileScreen(
         toggleTheme: widget.toggleTheme,
       ),
@@ -136,10 +134,6 @@ class _MainNavigationState extends State<MainNavigation> {
                   BottomNavigationBarItem(
                     icon: Icon(Icons.event),
                     label: 'Activities',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.person),
-                    label: 'Profile',
                   ),
                 ] : const [
                   BottomNavigationBarItem(

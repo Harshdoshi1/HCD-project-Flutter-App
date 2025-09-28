@@ -1,124 +1,329 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import '../../providers/user_provider.dart';
+import '../../models/user_model.dart';
+import '../../utils/api_config.dart';
 
-class ParentActivitiesScreen extends StatefulWidget {
+class ActivitiesScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
   
-  const ParentActivitiesScreen({super.key, required this.toggleTheme});
+  const ActivitiesScreen({super.key, required this.toggleTheme});
 
   @override
-  _ParentActivitiesScreenState createState() => _ParentActivitiesScreenState();
+  _ActivitiesScreenState createState() => _ActivitiesScreenState();
 }
 
-class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _ActivitiesScreenState extends State<ActivitiesScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  bool _isLoading = true;
+  String? _error;
+  String? _enrollmentNumber;
+  String? _studentName;
+  int? _currentSemester;
+  List<dynamic> _activities = [];
+  int _totalCurrentCocurricular = 0;
+  int _totalCurrentExtracurricular = 0;
+  int _selectedTabIndex = 0; // 0 for co-curricular, 1 for extra-curricular
   
-  String _selectedFilter = 'All';
-  final List<String> _filterOptions = ['All', 'Assignments', 'Events', 'Announcements', 'Exams'];
-  
-  // Activity statistics from database
-  Map<String, int>? _activityStats;
-  bool _isLoadingStats = true;
-  String? _statsError;
-  
-  // Recent activities data from database
-  List<Map<String, dynamic>> _recentActivities = [];
-  bool _isLoadingActivities = true;
-  String? _activitiesError;
-
-
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-    _controller.forward();
-    
-    // Fetch real data from database
-    _fetchActivityData();
+    _tabController = TabController(length: 2, vsync: this);
+    _getUserData();
   }
-
-  // Fetch activity statistics and recent activities from database
-  Future<void> _fetchActivityData() async {
-    try {
-      setState(() {
-        _isLoadingStats = true;
-        _isLoadingActivities = true;
-        _statsError = null;
-        _activitiesError = null;
-      });
-      
-      // Simulate API call - replace with actual database call
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // In real implementation, this would be:
-      // final stats = await ActivityService.getActivityStatistics();
-      // final activities = await ActivityService.getCompletedActivities();
-      
-      // For now, simulate no data available from database
-      setState(() {
-        _activityStats = null; // No data available
-        _recentActivities = []; // No activities available
-        _isLoadingStats = false;
-        _isLoadingActivities = false;
-        _statsError = 'No activity statistics available from database';
-        _activitiesError = 'No completed activities found in database';
-      });
-    } catch (e) {
-      setState(() {
-        _isLoadingStats = false;
-        _isLoadingActivities = false;
-        _statsError = 'Failed to fetch activity statistics';
-        _activitiesError = 'Failed to fetch activity data';
-      });
-    }
-  }
-
+  
   @override
   void dispose() {
-    _controller.dispose();
+    _tabController.dispose();
     super.dispose();
   }
-
-  // Get completed/graded activities only from database
-  List<Map<String, dynamic>> get _completedActivities {
-    // Filter to show only completed/graded activities, not upcoming ones
-    return _recentActivities.where((activity) => 
-      activity['status'] == 'Completed' || 
-      activity['status'] == 'Graded' ||
-      activity['grade'] != null
-    ).toList();
-  }
-
-  List<Map<String, dynamic>> get _filteredActivities {
-    final completed = _completedActivities;
-    if (_selectedFilter == 'All') {
-      return completed;
+  
+  Future<void> _getUserData() async {
+    try {
+      // Get user data from provider
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final User? user = userProvider.user;
+      
+      // Get token from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (user != null && token != null) {
+        print('User data from provider: ${user.name}, ${user.enrollmentNumber}');
+        
+        setState(() {
+          _enrollmentNumber = user.enrollmentNumber;
+          _studentName = user.name;
+          _currentSemester = user.currentSemester;
+        });
+        
+        if (_enrollmentNumber != null && _enrollmentNumber!.isNotEmpty) {
+          await _fetchActivities();
+        } else {
+          setState(() {
+            _error = 'Enrollment number not found in user data.';
+            _isLoading = false;
+          });
+        }
+      } else {
+        // If user is not in provider, try to get it from SharedPreferences as fallback
+        final userData = prefs.getString('userData');
+        
+        if (userData != null && token != null) {
+          final decodedData = json.decode(userData);
+          print('User data from SharedPreferences: $decodedData');
+          
+          setState(() {
+            _enrollmentNumber = decodedData['enrollmentNumber'];
+            _studentName = decodedData['name'];
+            _currentSemester = decodedData['currentSemester'] ?? decodedData['semester'] ?? 4;
+          });
+          
+          await _fetchActivities();
+        } else {
+          setState(() {
+            _error = 'User data or token not found. Please log in again.';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error getting user data: $e');
+      setState(() {
+        _error = 'Error getting user data: $e';
+        _isLoading = false;
+      });
     }
-    return completed.where((activity) => 
-      activity['type'].toString().toLowerCase().contains(_selectedFilter.toLowerCase())
-    ).toList();
+  }
+  
+  Future<void> _fetchActivities() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token == null) {
+        setState(() {
+          _error = 'Authentication token not found. Please log in again.';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      print('Fetching activities for enrollment number: $_enrollmentNumber');
+      
+      // First, fetch the total activity points from the endpoint
+      try {
+        final pointsResponse = await http.post(
+          Uri.parse(ApiConfig.getUrl('events/fetchTotalActivityPoints')),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({
+            'enrollmentNumber': _enrollmentNumber,
+          }),
+        );
+        
+        print('Total points response status: ${pointsResponse.statusCode}');
+        print('Total points response body: ${pointsResponse.body}');
+        
+        if (pointsResponse.statusCode == 200) {
+          final pointsData = json.decode(pointsResponse.body);
+          
+          setState(() {
+            _totalCurrentCocurricular = pointsData['totalCocurricular'] != null ? 
+                int.parse(pointsData['totalCocurricular'].toString()) : 0;
+            _totalCurrentExtracurricular = pointsData['totalExtracurricular'] != null ? 
+                int.parse(pointsData['totalExtracurricular'].toString()) : 0;
+          });
+        }
+      } catch (e) {
+        print('Error fetching total points: $e');
+        // Will fallback to calculating from events if this fails
+      }
+      
+      // Get all semesters' activities using the same approach as StudentAnalysis.jsx
+      final allResponse = await http.post(
+        Uri.parse(ApiConfig.getUrl('events/fetchEventsbyEnrollandSemester')),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'enrollmentNumber': _enrollmentNumber,
+          'semester': 'all'
+        }),
+      );
+      
+      print('All semesters response status: ${allResponse.statusCode}');
+      print('All semesters response body: ${allResponse.body}');
+      
+      List<dynamic> enrichedActivitiesList = [];
+      
+      if (allResponse.statusCode == 200) {
+        final data = json.decode(allResponse.body);
+        
+        if (data is List && data.isNotEmpty) {
+          // Extract event IDs from the response (same as StudentAnalysis.jsx)
+          Set<String> eventIds = {};
+          Map<int, Map<String, int>> semesterPoints = {};
+          
+          for (var item in data) {
+            final semester = int.tryParse(item['semester']?.toString() ?? '0') ?? 0;
+            final cocurricular = int.parse(item['totalCocurricular']?.toString() ?? '0');
+            final extracurricular = int.parse(item['totalExtracurricular']?.toString() ?? '0');
+            
+            // Store semester points
+            if (!semesterPoints.containsKey(semester)) {
+              semesterPoints[semester] = {'cocurricular': 0, 'extracurricular': 0};
+            }
+            semesterPoints[semester]!['cocurricular'] = semesterPoints[semester]!['cocurricular']! + cocurricular;
+            semesterPoints[semester]!['extracurricular'] = semesterPoints[semester]!['extracurricular']! + extracurricular;
+            
+            // Extract event IDs (CSV format)
+            if (item['eventId'] != null) {
+              final ids = item['eventId'].toString().split(',').map((id) => id.trim()).where((id) => id.isNotEmpty);
+              eventIds.addAll(ids);
+            }
+          }
+          
+          print('Extracted event IDs: $eventIds');
+          
+          if (eventIds.isNotEmpty) {
+            // Convert to comma-separated string as required by the API
+            final eventIdsString = eventIds.join(',');
+            print('Sending event IDs as string: $eventIdsString');
+            
+            // Fetch event details from EventMaster table (same endpoint as StudentAnalysis.jsx)
+            final eventDetailsResponse = await http.post(
+              Uri.parse(ApiConfig.getUrl('events/fetchEventsByIds')),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: json.encode({
+                'eventIds': eventIdsString
+              }),
+            );
+            
+            print('Event details response: ${eventDetailsResponse.body}');
+            
+            if (eventDetailsResponse.statusCode == 200) {
+              final eventDetailsData = json.decode(eventDetailsResponse.body);
+              
+              if (eventDetailsData['success'] == true && eventDetailsData['data'] is List) {
+                // Process event details and create enriched activity list
+                for (var event in eventDetailsData['data']) {
+                  // Find which semester this event belongs to by checking original data
+                  int eventSemester = _currentSemester ?? 1; // Default
+                  int cocurricularPoints = 0;
+                  int extracurricularPoints = 0;
+                  
+                  // Find semester and points for this event
+                  for (var item in data) {
+                    if (item['eventId']?.toString().contains(event['id'].toString()) == true) {
+                      eventSemester = int.tryParse(item['semester']?.toString() ?? '0') ?? (_currentSemester ?? 1);
+                      cocurricularPoints = int.parse(item['totalCocurricular']?.toString() ?? '0');
+                      extracurricularPoints = int.parse(item['totalExtracurricular']?.toString() ?? '0');
+                      break;
+                    }
+                  }
+                  
+                  // Get individual event points from the event master table
+                  // Handle different field names for points
+                  final eventType = (event['eventType'] ?? event['Event_Type'] ?? 'unknown').toString().toLowerCase();
+                  int eventCocurricularPoints = 0;
+                  int eventExtracurricularPoints = 0;
+                  
+                  // Determine points based on event type
+                  if (eventType.contains('co-curricular') || eventType.contains('cocurricular')) {
+                    eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                  } else if (eventType.contains('extra-curricular') || eventType.contains('extracurricular')) {
+                    eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? event['points']?.toString() ?? '0');
+                  } else {
+                    // If type is unclear, try to get both
+                    eventCocurricularPoints = int.parse(event['cocurricularPoints']?.toString() ?? '0');
+                    eventExtracurricularPoints = int.parse(event['extracurricularPoints']?.toString() ?? '0');
+                    
+                    // If both are 0, use general points field
+                    if (eventCocurricularPoints == 0 && eventExtracurricularPoints == 0) {
+                      final generalPoints = int.parse(event['points']?.toString() ?? '0');
+                      if (eventType.contains('co') || eventType.contains('technical') || eventType.contains('academic')) {
+                        eventCocurricularPoints = generalPoints;
+                      } else {
+                        eventExtracurricularPoints = generalPoints;
+                      }
+                    }
+                  }
+                  
+                  enrichedActivitiesList.add({
+                    'id': event['id'],
+                    'eventId': event['id'].toString(),
+                    'eventName': event['eventName'] ?? event['Event_Name'] ?? 'Unknown Event',
+                    'eventType': event['eventType'] ?? event['Event_Type'] ?? 'unknown',
+                    'eventDate': event['eventDate'] ?? event['Event_Date'],
+                    'description': event['description'] ?? event['Description'],
+                    'semester': eventSemester,
+                    'totalCocurricular': cocurricularPoints, // Total for semester
+                    'totalExtracurricular': extracurricularPoints, // Total for semester
+                    'eventCocurricularPoints': eventCocurricularPoints, // Individual event points
+                    'eventExtracurricularPoints': eventExtracurricularPoints, // Individual event points
+                    'participationType': event['participationType'] ?? event['position'] ?? 'Participant',
+                  });
+                }
+                
+                print('Enriched ${enrichedActivitiesList.length} activities with event details');
+              } else {
+                print('Unexpected event details format: ${eventDetailsData}');
+              }
+            } else {
+              print('Failed to fetch event details: ${eventDetailsResponse.statusCode}');
+            }
+          }
+        } else if (data is Map && data.containsKey('message')) {
+          print('No activities found: ${data['message']}');
+        }
+      }
+      
+      setState(() {
+        _activities = enrichedActivitiesList;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching activities: $e');
+      setState(() {
+        _error = 'Error fetching activities: $e';
+        _isLoading = false;
+      });
+    }
+  }
+  
+  // Get co-curricular activities only
+  List<dynamic> get _coCurricularActivities {
+    return _activities.where((activity) => 
+      activity['eventType'] == 'co-curricular').toList();
+  }
+  
+  // Get extra-curricular activities only
+  List<dynamic> get _extraCurricularActivities {
+    return _activities.where((activity) => 
+      activity['eventType'] == 'extra-curricular').toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: isDark ? Colors.black : Colors.white,
       body: Stack(
         children: [
           // Gradient background
@@ -135,161 +340,271 @@ class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with Si
               ),
             ),
           ),
-          Column(
-            children: [
-              // Header section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ClipRRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Student Activities',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
+          
+          SafeArea(
+            child: Column(
+              children: [
+                // App bar without back button
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Text(
+                      '${_studentName ?? 'Student'}\'s Activities',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Student info card
+                if (_studentName != null && _enrollmentNumber != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _studentName ?? 'Student',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Enrollment: $_enrollmentNumber',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Current Semester: $_currentSemester',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // CC/EC buttons
+                Container(
+                  margin: const EdgeInsets.all(16.0),
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.05) 
+                        : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Row(
+                    children: [
+                      // Co-curricular button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedTabIndex = 0;
+                              _tabController.animateTo(0);
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(25),
+                              color: _selectedTabIndex == 0
+                                ? Colors.blue.withOpacity(0.2)
+                                : Colors.transparent,
                             ),
-                            const SizedBox(height: 12),
-                            SlideTransition(
-                              position: _slideAnimation,
-                              child: SizedBox(
-                                height: 36,
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: _filterOptions.map((filter) {
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                                        child: _buildFilterChip(filter),
-                                      );
-                                    }).toList(),
-                                  ),
+                            child: Center(
+                              child: Text(
+                                'Co-Curricular',
+                                style: TextStyle(
+                                  color: _selectedTabIndex == 0
+                                    ? Colors.blue
+                                    : isDark ? Colors.white70 : Colors.black54,
+                                  fontWeight: _selectedTabIndex == 0
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                      // Extra-curricular button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedTabIndex = 1;
+                              _tabController.animateTo(1);
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(25),
+                              color: _selectedTabIndex == 1
+                                ? Colors.green.withOpacity(0.2)
+                                : Colors.transparent,
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Extra-Curricular',
+                                style: TextStyle(
+                                  color: _selectedTabIndex == 1
+                                    ? Colors.green
+                                    : isDark ? Colors.white70 : Colors.black54,
+                                  fontWeight: _selectedTabIndex == 1
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              // Activities content
-              Expanded(
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                
+                // Points summary
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.1) 
+                        : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark 
+                          ? Colors.white.withOpacity(0.2) 
+                          : Colors.black.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
                         children: [
-                          // Statistics containers
-                          _buildActivityStatistics(isDark),
-                          const SizedBox(height: 24),
-                          
-                          // Recent Activities section
-                          _buildRecentActivitiesSection(isDark),
-                          const SizedBox(height: 24),
-                          
-                          // All Activities section
-                          _buildAllActivitiesSection(isDark),
+                          Text(
+                            'Total Co-Curricular',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_totalCurrentCocurricular',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: isDark ? Colors.white30 : Colors.black12,
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            'Total Extra-Curricular',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_totalCurrentExtracurricular',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+
+                
+                // Content
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                          ? _buildErrorWidget()
+                          : _selectedTabIndex == 0
+                              ? _buildActivityList(_coCurricularActivities, "Co-Curricular")
+                              : _buildActivityList(_extraCurricularActivities, "Extra-Curricular"),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildFilterChip(String filter) {
-    final isSelected = _selectedFilter == filter;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFilter = filter;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? const Color(0xFF03A9F4).withOpacity(0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected 
-                ? const Color(0xFF03A9F4)
-                : (isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-            width: 1,
-          ),
-        ),
-        child: Text(
-          filter,
-          style: TextStyle(
-            color: isSelected 
-                ? const Color(0xFF03A9F4)
-                : (isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Widget for no activities state
-  Widget _buildNoActivitiesMessage() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  Widget _buildErrorWidget() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.storage,
-              size: 60,
-              color: isDark 
-                  ? Colors.white.withOpacity(0.5) 
-                  : Colors.black.withOpacity(0.5),
-            ),
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
             const SizedBox(height: 16),
-            Text(
-              'No completed activities',
+            const Text(
+              'Error Loading Activities',
               style: TextStyle(
-                color: isDark ? Colors.white : Colors.black,
-                fontSize: 18,
+                fontSize: 18, 
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              _activitiesError ?? 'No graded activities available from database',
+              _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.7) 
-                    : Colors.black.withOpacity(0.7),
-              ),
+              style: const TextStyle(color: Colors.red),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _isLoading = true;
+                  _error = null;
+                });
+                _fetchActivities();
+              },
+              child: const Text('Retry'),
             ),
           ],
         ),
@@ -297,1020 +612,128 @@ class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with Si
     );
   }
 
-  // Build activity card
-  Widget _buildActivityCard(Map<String, dynamic> activity, BuildContext context) {
+  Widget _buildActivityList(List<dynamic> activities, String type) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dueDate = activity['dueDate'] as DateTime;
-    final daysUntilDue = dueDate.difference(DateTime.now()).inDays;
     
-    // Determine urgency color
-    Color urgencyColor = Colors.grey;
-    if (daysUntilDue <= 1) {
-      urgencyColor = Colors.red;
-    } else if (daysUntilDue <= 3) {
-      urgencyColor = Colors.orange;
-    } else if (daysUntilDue <= 7) {
-      urgencyColor = Colors.amber;
-    } else {
-      urgencyColor = Colors.green;
+    if (activities.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: isDark ? Colors.white54 : Colors.black38,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No $type Activities Found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      );
     }
     
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: () {
-          _showActivityDetails(activity, context);
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.1) 
-                    : Colors.black.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark 
-                      ? Colors.white.withOpacity(0.2) 
-                      : Colors.black.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    // Activity icon
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: (activity['color'] as Color).withOpacity(0.2),
-                        border: Border.all(
-                          color: activity['color'] as Color,
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        activity['icon'] as IconData,
-                        color: activity['color'] as Color,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Activity details
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  activity['title'],
-                                  style: TextStyle(
-                                    color: isDark ? Colors.white : Colors.black,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: urgencyColor.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: urgencyColor,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  activity['priority'],
-                                  style: TextStyle(
-                                    color: urgencyColor,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            activity['subject'],
-                            style: TextStyle(
-                              color: isDark 
-                                  ? Colors.white.withOpacity(0.7) 
-                                  : Colors.black.withOpacity(0.7),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.access_time,
-                                size: 14,
-                                color: isDark 
-                                    ? Colors.white.withOpacity(0.5) 
-                                    : Colors.black.withOpacity(0.5),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                daysUntilDue == 0 
-                                    ? 'Due today'
-                                    : daysUntilDue == 1
-                                        ? 'Due tomorrow'
-                                        : 'Due in $daysUntilDue days',
-                                style: TextStyle(
-                                  color: urgencyColor,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF03A9F4).withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  activity['status'],
-                                  style: const TextStyle(
-                                    color: Color(0xFF03A9F4),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Arrow icon
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isDark 
-                            ? Colors.white.withOpacity(0.1) 
-                            : Colors.black.withOpacity(0.1),
-                      ),
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        color: isDark ? Colors.white : Colors.black,
-                        size: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: activities.length,
+      itemBuilder: (context, index) {
+        final activity = activities[index];
+        return _buildActivityCard(activity, isDark);
+      },
+    );
+  }
+  
+  Widget _buildActivityCard(dynamic activity, bool isDark) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      color: isDark 
+          ? Colors.white.withOpacity(0.1) 
+          : Colors.black.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark 
+              ? Colors.white.withOpacity(0.2) 
+              : Colors.black.withOpacity(0.1),
+          width: 1,
         ),
       ),
-    );
-  }
-
-  void _showActivityDetails(Map<String, dynamic> activity, BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dueDate = activity['dueDate'] as DateTime;
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? Colors.black.withOpacity(0.9) 
-                  : Colors.white.withOpacity(0.9),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border.all(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.2) 
-                    : Colors.black.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isDark 
-                          ? Colors.white.withOpacity(0.3) 
-                          : Colors.black.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // Activity header
-                Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: (activity['color'] as Color).withOpacity(0.2),
-                        border: Border.all(
-                          color: activity['color'] as Color,
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        activity['icon'] as IconData,
-                        color: activity['color'] as Color,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            activity['title'],
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            activity['subject'],
-                            style: TextStyle(
-                              color: isDark 
-                                  ? Colors.white.withOpacity(0.7) 
-                                  : Colors.black.withOpacity(0.7),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                // Activity details
-                _buildDetailRow('Type', activity['type'], Icons.category, isDark),
-                _buildDetailRow('Status', activity['status'], Icons.info_outline, isDark),
-                _buildDetailRow('Priority', activity['priority'], Icons.flag, isDark),
-                _buildDetailRow(
-                  'Due Date', 
-                  '${dueDate.day}/${dueDate.month}/${dueDate.year}', 
-                  Icons.calendar_today, 
-                  isDark
-                ),
-                const SizedBox(height: 16),
-                // Description
-                Text(
-                  'Description',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  activity['description'],
-                  style: TextStyle(
-                    color: isDark 
-                        ? Colors.white.withOpacity(0.8) 
-                        : Colors.black.withOpacity(0.8),
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Close button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF03A9F4),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, IconData icon, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: const Color(0xFF03A9F4),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '$label:',
-            style: TextStyle(
-              color: isDark 
-                  ? Colors.white.withOpacity(0.7) 
-                  : Colors.black.withOpacity(0.7),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build activity statistics containers
-  Widget _buildActivityStatistics(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Activity Overview',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _isLoadingStats
-            ? _buildLoadingStats(isDark)
-            : Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Co-Curricular',
-                      _activityStats?['coCurricular']?.toString() ?? 'Unavailable',
-                      Icons.school,
-                      Colors.blue,
-                      isDark,
-                      'Sports, Competitions, Academic Events',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Extra-Curricular',
-                      _activityStats?['extraCurricular']?.toString() ?? 'Unavailable',
-                      Icons.groups,
-                      Colors.purple,
-                      isDark,
-                      'Clubs, Volunteering, Cultural Activities',
-                    ),
-                  ),
-                ],
-              ),
-      ],
-    );
-  }
-
-  // Build individual stat card
-  Widget _buildStatCard(
-    String title,
-    String count,
-    IconData icon,
-    Color color,
-    bool isDark,
-    String description,
-  ) {
-    final isUnavailable = count == 'Unavailable' || _statsError != null;
-    
-    return GestureDetector(
-      onTap: () => _showStatDetails(title, count, description, color, isDark),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? Colors.white.withOpacity(0.1) 
-                  : Colors.black.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isUnavailable 
-                    ? Colors.grey.withOpacity(0.3)
-                    : color.withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isUnavailable 
-                            ? Colors.grey.withOpacity(0.2)
-                            : color.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        isUnavailable ? Icons.error_outline : icon,
-                        color: isUnavailable ? Colors.grey : color,
-                        size: 24,
+                    Expanded(
+                      child: Text(
+                        activity['eventName'] ?? activity['Event_Name'] ?? activity['name'] ?? 'Unknown Event',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
                       ),
                     ),
-                    const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isUnavailable 
-                            ? Colors.grey.withOpacity(0.1)
-                            : color.withOpacity(0.1),
+                        color: activity['eventType'] == 'co-curricular'
+                            ? Colors.blue.withOpacity(0.2)
+                            : Colors.green.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isUnavailable ? 'Unavailable' : 'Active',
+                        (activity['eventType'] ?? activity['Event_Type']) == 'co-curricular' 
+                            ? 'CC: ${activity['eventCocurricularPoints'] ?? activity['totalCocurricular'] ?? activity['Total_Cocurricular'] ?? 0}' 
+                            : 'EC: ${activity['eventExtracurricularPoints'] ?? activity['totalExtracurricular'] ?? activity['Total_Extracurricular'] ?? 0}',
                         style: TextStyle(
-                          color: isUnavailable ? Colors.grey : color,
-                          fontSize: 10,
+                          color: (activity['eventType'] ?? activity['Event_Type']) == 'co-curricular'
+                              ? Colors.blue
+                              : Colors.green,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 Text(
-                  isUnavailable ? 'N/A' : count,
+                  'Participation: ${activity['participationType'] ?? activity['Participation_Type'] ?? 'General'}',
                   style: TextStyle(
-                    color: isUnavailable 
-                        ? Colors.grey 
-                        : (isDark ? Colors.white : Colors.black),
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.7) 
+                        : Colors.black.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  title,
-                  style: TextStyle(
-                    color: isUnavailable 
-                        ? Colors.grey
-                        : (isDark 
-                            ? Colors.white.withOpacity(0.8) 
-                            : Colors.black.withOpacity(0.8)),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isUnavailable 
-                      ? 'Data unavailable from database'
-                      : 'Activities completed',
-                  style: TextStyle(
-                    color: isUnavailable 
-                        ? Colors.grey
-                        : (isDark 
-                            ? Colors.white.withOpacity(0.6) 
-                            : Colors.black.withOpacity(0.6)),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Build recent activities section
-  Widget _buildRecentActivitiesSection(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Recent Activities',
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: () {
-                // Navigate to full activities list
-              },
-              child: const Text(
-                'View All',
-                style: TextStyle(
-                  color: Color(0xFF03A9F4),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 180,
-          child: _isLoadingActivities
-              ? _buildLoadingActivities(isDark)
-              : _completedActivities.isEmpty
-                  ? _buildNoRecentActivities(isDark)
-                  : ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _completedActivities.length,
-                      itemBuilder: (context, index) {
-                        final activity = _completedActivities[index];
-                        return _buildRecentActivityCard(activity, isDark);
-                      },
-                    ),
-        ),
-      ],
-    );
-  }
-
-  // Build recent activity card
-  Widget _buildRecentActivityCard(Map<String, dynamic> activity, bool isDark) {
-    final date = activity['date'] as DateTime;
-    final daysAgo = DateTime.now().difference(date).inDays;
-    final isUnavailable = activity['status'] == 'Unavailable';
-    
-    return Container(
-      width: 280,
-      margin: const EdgeInsets.only(right: 12),
-      child: GestureDetector(
-        onTap: () => _showRecentActivityDetails(activity, isDark),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.1) 
-                    : Colors.black.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isUnavailable 
-                      ? Colors.grey.withOpacity(0.3)
-                      : (activity['color'] as Color).withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isUnavailable 
-                              ? Colors.grey.withOpacity(0.2)
-                              : (activity['color'] as Color).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          activity['icon'] as IconData,
-                          color: isUnavailable 
-                              ? Colors.grey
-                              : activity['color'] as Color,
-                          size: 20,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isUnavailable 
-                              ? Colors.grey.withOpacity(0.2)
-                              : const Color(0xFF03A9F4).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          activity['type'],
-                          style: TextStyle(
-                            color: isUnavailable 
-                                ? Colors.grey
-                                : const Color(0xFF03A9F4),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    activity['title'],
-                    style: TextStyle(
-                      color: isUnavailable 
-                          ? Colors.grey
-                          : (isDark ? Colors.white : Colors.black),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    activity['description'],
-                    style: TextStyle(
-                      color: isUnavailable 
-                          ? Colors.grey.withOpacity(0.7)
-                          : (isDark 
-                              ? Colors.white.withOpacity(0.7) 
-                              : Colors.black.withOpacity(0.7)),
-                      fontSize: 12,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: isUnavailable 
-                            ? Colors.grey
-                            : (isDark 
-                                ? Colors.white.withOpacity(0.5) 
-                                : Colors.black.withOpacity(0.5)),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isUnavailable 
-                            ? 'No data'
-                            : daysAgo == 0 
-                                ? 'Today'
-                                : '$daysAgo days ago',
-                        style: TextStyle(
-                          color: isUnavailable 
-                              ? Colors.grey
-                              : (isDark 
-                                  ? Colors.white.withOpacity(0.5) 
-                                  : Colors.black.withOpacity(0.5)),
-                          fontSize: 12,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (!isUnavailable && activity['points'] > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${activity['points']} pts',
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Build all activities section
-  Widget _buildAllActivitiesSection(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'All Activities',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _isLoadingActivities
-            ? _buildLoadingActivities(isDark)
-            : _filteredActivities.isEmpty
-                ? _buildNoActivitiesMessage()
-                : Column(
-                    children: _filteredActivities.map((activity) {
-                      return _buildActivityCard(activity, context);
-                    }).toList(),
-                  ),
-      ],
-    );
-  }
-
-  // Build loading stats widget
-  Widget _buildLoadingStats(bool isDark) {
-    return Row(
-      children: [
-        Expanded(child: _buildLoadingStatCard(isDark)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildLoadingStatCard(isDark)),
-      ],
-    );
-  }
-
-  Widget _buildLoadingStatCard(bool isDark) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark 
-                ? Colors.white.withOpacity(0.1) 
-                : Colors.black.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.grey.withOpacity(0.3),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Loading...',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: 60,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                width: 80,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: 120,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Build loading activities widget
-  Widget _buildLoadingActivities(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            color: Color(0xFF03A9F4),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Loading activities from database...',
-            style: TextStyle(
-              color: isDark 
-                  ? Colors.white.withOpacity(0.7) 
-                  : Colors.black.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build no recent activities widget
-  Widget _buildNoRecentActivities(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.storage,
-            size: 48,
-            color: isDark 
-                ? Colors.white.withOpacity(0.5) 
-                : Colors.black.withOpacity(0.5),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No completed activities',
-            style: TextStyle(
-              color: isDark 
-                  ? Colors.white.withOpacity(0.7) 
-                  : Colors.black.withOpacity(0.7),
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _activitiesError ?? 'No graded activities found in database',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isDark 
-                  ? Colors.white.withOpacity(0.5) 
-                  : Colors.black.withOpacity(0.5),
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Show stat details modal
-  void _showStatDetails(String title, String count, String description, Color color, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? Colors.black.withOpacity(0.9) 
-                  : Colors.white.withOpacity(0.9),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border.all(
-                color: color.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  count == 'Unavailable' ? 'Data not available' : '$count activities completed',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  description,
-                  textAlign: TextAlign.center,
+                  'Semester: ${activity['semester'] ?? 'N/A'}',
                   style: TextStyle(
                     color: isDark 
-                        ? Colors.white.withOpacity(0.8) 
-                        : Colors.black.withOpacity(0.8),
-                    fontSize: 14,
-                    height: 1.5,
+                        ? Colors.white.withOpacity(0.7) 
+                        : Colors.black.withOpacity(0.7),
                   ),
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: color,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  'Date: ${(activity['eventDate'] ?? activity['Event_Date']) != null ? _formatDate(activity['eventDate'] ?? activity['Event_Date']) : 'N/A'}',
+                  style: TextStyle(
+                    color: isDark 
+                        ? Colors.white.withOpacity(0.7) 
+                        : Colors.black.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -1320,174 +743,14 @@ class _ParentActivitiesScreenState extends State<ParentActivitiesScreen> with Si
       ),
     );
   }
-
-  // Show recent activity details
-  void _showRecentActivityDetails(Map<String, dynamic> activity, bool isDark) {
-    final isUnavailable = activity['status'] == 'Unavailable';
-    final date = activity['date'] as DateTime;
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? Colors.black.withOpacity(0.9) 
-                  : Colors.white.withOpacity(0.9),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border.all(
-                color: isUnavailable 
-                    ? Colors.grey.withOpacity(0.3)
-                    : (activity['color'] as Color).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isUnavailable 
-                          ? Colors.grey.withOpacity(0.3)
-                          : (activity['color'] as Color).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isUnavailable 
-                            ? Colors.grey.withOpacity(0.2)
-                            : (activity['color'] as Color).withOpacity(0.2),
-                        border: Border.all(
-                          color: isUnavailable 
-                              ? Colors.grey
-                              : activity['color'] as Color,
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        activity['icon'] as IconData,
-                        color: isUnavailable 
-                            ? Colors.grey
-                            : activity['color'] as Color,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            activity['title'],
-                            style: TextStyle(
-                              color: isUnavailable 
-                                  ? Colors.grey
-                                  : (isDark ? Colors.white : Colors.black),
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            activity['type'],
-                            style: TextStyle(
-                              color: isUnavailable 
-                                  ? Colors.grey
-                                  : (isDark 
-                                      ? Colors.white.withOpacity(0.7) 
-                                      : Colors.black.withOpacity(0.7)),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                ...(!isUnavailable ? [
-                  _buildDetailRow('Status', activity['status'], Icons.info_outline, isDark),
-                  _buildDetailRow(
-                    'Date', 
-                    '${date.day}/${date.month}/${date.year}', 
-                    Icons.calendar_today, 
-                    isDark
-                  ),
-                  if (activity['points'] > 0)
-                    _buildDetailRow('Points', '${activity['points']}', Icons.star, isDark),
-                ] : [
-                  _buildDetailRow('Status', 'Data Unavailable', Icons.error_outline, isDark),
-                  _buildDetailRow('Reason', 'Server connection failed', Icons.wifi_off, isDark),
-                ]),
-                const SizedBox(height: 16),
-                Text(
-                  'Description',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  activity['description'],
-                  style: TextStyle(
-                    color: isUnavailable 
-                        ? Colors.grey
-                        : (isDark 
-                            ? Colors.white.withOpacity(0.8) 
-                            : Colors.black.withOpacity(0.8)),
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isUnavailable 
-                          ? Colors.grey
-                          : const Color(0xFF03A9F4),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],  
-            ),
-          ),
-        ),
-      ),
-    );
+  
+  String _formatDate(String? dateString) {
+    if (dateString == null) return 'N/A';
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 }

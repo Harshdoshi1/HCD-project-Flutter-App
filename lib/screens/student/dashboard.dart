@@ -7,12 +7,12 @@ import '../../utils/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'dart:ui';
-import 'dart:io';
 import 'dart:convert';
 import '../../providers/user_provider.dart';
 import '../../services/academic_service.dart';
 import '../../services/student_service.dart';
 import '../../services/student_analysis_service.dart';
+import '../../services/profile_service.dart';
 import '../../models/blooms_taxonomy_model.dart';
 import 'profile_screen.dart';
 import '../../constants/app_theme.dart';
@@ -34,6 +34,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   List<dynamic> _activities = [];
   String? _enrollmentNumber;  
   final AcademicService _academicService = AcademicService();
+  final ProfileService _profileService = ProfileService();
+  String? _profileImageUrl;
   List<SemesterSPI>? _spiData;
   List<Map<String, dynamic>> _semesterSPIData = [];
   bool _isLoadingSemesterSPI = true;
@@ -432,6 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final user = userProvider.user;
       
       if (user != null) {
+        if (!mounted) return;
         setState(() {
           _userName = user.name;
           _enrollmentNumber = user.enrollmentNumber;
@@ -477,6 +480,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final user = userProvider.user;
       
       if (user != null) {
+        if (!mounted) return;
         setState(() {
           _enrollmentNumber = user.enrollmentNumber;
         });
@@ -503,6 +507,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               
               print('Total activity points response: $pointsData');
               
+              if (!mounted) return;
               setState(() {
                 _cocurricularPoints = pointsData['totalCocurricular'] != null ? 
                     int.parse(pointsData['totalCocurricular'].toString()) : 0;
@@ -516,6 +521,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             final userData = prefs.getString('userData');
             if (userData != null) {
               final userMap = json.decode(userData);
+              if (!mounted) return;
               setState(() {
                 _cocurricularPoints = userMap['totalCocurricular'] ?? userMap['cocurricularPoints'] ?? 0;
                 _extracurricularPoints = userMap['totalExtracurricular'] ?? userMap['extracurricularPoints'] ?? 0;
@@ -576,6 +582,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 }
               }
               
+              if (!mounted) return;
               setState(() {
                 _activities = enrichedActivities;
                 _isLoadingActivityPoints = false;
@@ -592,11 +599,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             await _loadActivityPointsFallback(token);
           }
         } else {
+          if (!mounted) return;
           setState(() {
             _isLoadingActivityPoints = false;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _cocurricularPoints = 0;
           _extracurricularPoints = 0;
@@ -605,6 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     } catch (e) {
       debugPrint('Error loading activity points: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingActivityPoints = false;
       });
@@ -630,22 +640,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final data = json.decode(response.body);
         
         if (data is List && data.isNotEmpty) {
+          if (!mounted) return;
           setState(() {
             _activities = data;
             _isLoadingActivityPoints = false;
           });
         } else {
+          if (!mounted) return;
           setState(() {
             _isLoadingActivityPoints = false;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingActivityPoints = false;
         });
       }
     } catch (e) {
       print('Error in fallback method: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingActivityPoints = false;
       });
@@ -725,6 +739,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // Load profile image from database
+  Future<void> _loadProfileImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('userEmail');
+      
+      if (userEmail != null && userEmail.isNotEmpty) {
+        final imageUrl = await _profileService.getProfileImageUrl(userEmail);
+        if (mounted) {
+          setState(() {
+            _profileImageUrl = imageUrl;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+      if (mounted) {
+        setState(() {
+          _profileImageUrl = null;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -769,11 +807,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Start animation
     _graphAnimationController.forward();
     
-    // Load user data, SPI data, activity points and blooms data
+    // Load user data, SPI data, activity points, blooms data and profile image
     _loadUserData();
     _loadSPIData();
     _loadActivityPoints();
     _loadBloomsData();
+    _loadProfileImage();
     
     // Set random daily quote
     _dailyQuote = _dailyQuotes[DateTime.now().day % _dailyQuotes.length];
@@ -841,7 +880,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ),
                           const SizedBox(height: 4),
                           SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.6,
+                            width: MediaQuery.of(context).size.width * 0.5,
                             child: Text(
                               '"$_dailyQuote"',
                               style: TextStyle(
@@ -876,34 +915,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               ),
                             ],
                           ),
-                          child: FutureBuilder<SharedPreferences>(
-                            future: SharedPreferences.getInstance(),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null) {
-                                final prefs = snapshot.data!;
-                                final userEmail = prefs.getString('userEmail') ?? '';
-                                final imagePath = prefs.getString('${userEmail}_profileImage');
-                                
-                                if (imagePath != null && imagePath.isNotEmpty) {
-                                  final file = File(imagePath);
-                                  return CircleAvatar(
-                                    radius: 24,
-                                    backgroundImage: FileImage(file),
-                                  );
-                                }
-                              }
-                              
-                              return CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
-                                child: Icon(
-                                  Icons.person,
-                                  color: Theme.of(context).textTheme.bodyLarge!.color,
-                                  size: 32,
+                          child: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                              ? CircleAvatar(
+                                  radius: 24,
+                                  backgroundImage: NetworkImage(_profileImageUrl!),
+                                  onBackgroundImageError: (exception, stackTrace) {
+                                    print('Error loading profile image: $exception');
+                                  },
+                                )
+                              : CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                                  child: Icon(
+                                    Icons.person,
+                                    color: Theme.of(context).textTheme.bodyLarge!.color,
+                                    size: 32,
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
                         ),
                       ),
                     ],
@@ -911,6 +939,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   const SizedBox(height: 24),
                   // Charts section
                   _buildChartsSection(),
+                  const SizedBox(height: 24),
+                  // ICT Clubs section
+                  _buildICTClubsSection(),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -1057,10 +1088,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1074,17 +1105,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             ? Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
+                                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                     width: 1,
                                   ),
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Text(
                                     'Loading...',
-                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                    style: TextStyle(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, 
+                                      fontSize: 12
+                                    ),
                                   ),
                                 ),
                               )
@@ -1092,10 +1126,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.15),
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.3),
+                                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                         width: 1,
                                       ),
                                     ),
@@ -1104,8 +1138,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                         _availableSubjects.first.length > 18 
                                             ? '${_availableSubjects.first.substring(0, 18)}...' 
                                             : _availableSubjects.first,
-                                        style: const TextStyle(
-                                          color: Colors.white, 
+                                        style: TextStyle(
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, 
                                           fontSize: 12, 
                                           fontWeight: FontWeight.w600
                                         ),
@@ -1121,16 +1155,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.15),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(16),
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(0.3),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                               width: 1,
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.chevron_left,
-                                            color: Colors.white,
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                             size: 20,
                                           ),
                                         ),
@@ -1141,10 +1175,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                         child: Container(
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.1),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                                             borderRadius: BorderRadius.circular(16),
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(0.3),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                               width: 1,
                                             ),
                                           ),
@@ -1163,8 +1197,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                                   subject.length > 15 
                                                       ? '${subject.substring(0, 15)}...' 
                                                       : subject,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
+                                                  style: TextStyle(
+                                                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w600,
                                                   ),
@@ -1183,16 +1217,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.15),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(16),
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(0.3),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
                                               width: 1,
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.chevron_right,
-                                            color: Colors.white,
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                             size: 20,
                                           ),
                                         ),
@@ -1354,8 +1388,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
                               languages[value.toInt()],
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 10,
                               ),
@@ -1383,8 +1417,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         }
                         return Text(
                           text,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                             fontSize: 10,
                           ),
                         );
@@ -2457,7 +2491,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
-              tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
+              tooltipBgColor: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
               tooltipPadding: const EdgeInsets.all(8),
               tooltipMargin: 8,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -2466,7 +2500,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 final cpi = _semesterSPIData[groupIndex]['cpi'];
                 return BarTooltipItem(
                   'Semester $semester\n',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
                   children: [
                     TextSpan(text: 'SPI: ${spi.toStringAsFixed(2)}\n', style: const TextStyle(color: Colors.yellow)),
                     TextSpan(text: 'CPI: ${cpi.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent)),
@@ -2486,7 +2523,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       axisSide: meta.axisSide,
                       child: Text(
                         'S${_semesterSPIData[value.toInt()]['semester']}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          fontSize: 12,
+                        ),
                       ),
                     );
                   }
@@ -2504,7 +2544,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     axisSide: meta.axisSide,
                     child: Text(
                       value.toString(),
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                        fontSize: 10,
+                      ),
                     ),
                   );
                 },
@@ -2517,7 +2560,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             show: true,
             horizontalInterval: 1,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.white.withOpacity(0.1),
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
               strokeWidth: 1,
             ),
             drawVerticalLine: false,
@@ -2539,7 +2582,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
                     toY: 10,
-                    color: Colors.white.withOpacity(0.1),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                   ),
                 ),
               ],
@@ -3011,7 +3054,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             barTouchData: BarTouchData(
               enabled: true,
               touchTooltipData: BarTouchTooltipData(
-                tooltipBgColor: Colors.black.withOpacity(0.8),
+                tooltipBgColor: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
                 tooltipPadding: const EdgeInsets.all(8),
                 tooltipMargin: 8,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -3020,8 +3063,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final score = bloomLevel.score ?? 0;
                   return BarTooltipItem(
                     '${bloomLevel.level}\n${marks.toStringAsFixed(1)} marks\n($score%)',
-                    const TextStyle(
-                      color: Colors.white,
+                    TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                       fontWeight: FontWeight.bold,
                       fontSize: 11,
                     ),
@@ -3065,8 +3108,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
                           shortLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 9,
                           ),
@@ -3091,8 +3134,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         padding: const EdgeInsets.only(right: 4.0),
                         child: Text(
                           '${value.toInt()}',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                           ),
@@ -3113,7 +3156,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               horizontalInterval: _calculateGridInterval(maxMarks),
               getDrawingHorizontalLine: (value) {
                 return FlLine(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                   strokeWidth: 1,
                 );
               },
@@ -3301,4 +3344,383 @@ class RadarChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+
+extension DashboardExtension on _DashboardScreenState {
+  // ICT Clubs Section
+  Widget _buildICTClubsSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final clubs = [
+      {
+        'name': 'Competitive Programming Club',
+        'icon': Icons.code,
+        'color': const Color(0xFF4CAF50),
+        'description': 'Master algos and data structures',
+        'benefits': [
+          'Weekly coding contests and challenges',
+          'Interview preparation sessions',
+          'Mentorship from industry experts',
+          'Access to premium coding platforms',
+          'Participation in national competitions'
+        ],
+        'joinLink': 'https://forms.google.com/competitive-programming'
+      },
+      {
+        'name': 'Data Science Club',
+        'icon': Icons.analytics,
+        'color': const Color(0xFF2196F3),
+        'description': 'Explore AI, ML, and data analytics',
+        'benefits': [
+          'Hands-on machine learning projects',
+          'Industry guest lectures and workshops',
+          'Access to premium datasets and tools',
+          'Kaggle competition participation',
+          'Research collaboration opportunities'
+        ],
+        'joinLink': 'https://forms.google.com/data-science'
+      },
+      {
+        'name': 'Circuitology Club',
+        'icon': Icons.memory,
+        'color': const Color(0xFFFF9800),
+        'description': 'Hardware design and electronics',
+        'benefits': [
+          'PCB design and fabrication workshops',
+          'Arduino and Raspberry Pi projects',
+          'IoT development sessions',
+          'Hardware hackathons',
+          'Industry internship opportunities'
+        ],
+        'joinLink': 'https://forms.google.com/circuitology'
+      }
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Club Cards
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: clubs.length,
+            itemBuilder: (context, index) {
+              final club = clubs[index];
+              return Container(
+                width: 280,
+                margin: EdgeInsets.only(
+                  right: index < clubs.length - 1 ? 16 : 0,
+                ),
+                child: GestureDetector(
+                  onTap: () => _showClubDetails(club),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              (club['color'] as Color).withOpacity(0.2),
+                              (club['color'] as Color).withOpacity(0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: (club['color'] as Color).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: (club['color'] as Color).withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: club['color'] as Color,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      club['icon'] as IconData,
+                                      color: club['color'] as Color,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (club['color'] as Color).withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      'Join Now',
+                                      style: TextStyle(
+                                        color: club['color'] as Color,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                club['name'] as String,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                club['description'] as String,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark 
+                                      ? Colors.white.withOpacity(0.8) 
+                                      : Colors.black.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showClubDetails(Map<String, dynamic> club) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              width: double.maxFinite,
+              constraints: const BoxConstraints(maxHeight: 600),
+              decoration: BoxDecoration(
+                color: isDark 
+                    ? Colors.black.withOpacity(0.8) 
+                    : Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: (club['color'] as Color).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          (club['color'] as Color).withOpacity(0.2),
+                          (club['color'] as Color).withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: (club['color'] as Color).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: club['color'] as Color,
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            club['icon'] as IconData,
+                            color: club['color'] as Color,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                club['name'] as String,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                club['description'] as String,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark 
+                                      ? Colors.white.withOpacity(0.7) 
+                                      : Colors.black.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Benefits
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Benefits & Opportunities',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ...(club['benefits'] as List<String>).map((benefit) => 
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 4),
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: club['color'] as Color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      benefit,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isDark 
+                                            ? Colors.white.withOpacity(0.8) 
+                                            : Colors.black.withOpacity(0.8),
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ).toList(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Action Buttons
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: isDark 
+                                      ? Colors.white.withOpacity(0.3) 
+                                      : Colors.black.withOpacity(0.3),
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              'Close',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Open Google Form link
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Opening ${club['name']} registration form...'),
+                                  backgroundColor: club['color'] as Color,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: club['color'] as Color,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Join Club',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

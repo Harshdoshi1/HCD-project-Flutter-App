@@ -22,12 +22,17 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   late AnimationController _controller;
   late AnimationController _particleController;
+  late AnimationController _waveController;
+  late AnimationController _textController;
   late Animation<double> _logoScaleAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<double> _blurAnimation;
   late Animation<double> _rotationAnimation;
   late Animation<double> _pulseAnimation;
   late Animation<Color?> _colorAnimation;
+  late Animation<double> _waveAnimation;
+  late Animation<Offset> _textSlideAnimation;
+  late Animation<double> _textFadeAnimation;
   
   bool _isLoggedIn = false;
 
@@ -43,6 +48,16 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 4000),
       vsync: this,
     )..repeat();
+    
+    _waveController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+    
+    _textController = AnimationController(
+      duration: const Duration(milliseconds: 2500),
+      vsync: this,
+    );
     
     _logoScaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
@@ -97,8 +112,39 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       ),
     );
     
+    _waveAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _waveController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    _textSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _textController,
+        curve: Curves.elasticOut,
+      ),
+    );
+    
+    _textFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _textController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+      ),
+    );
+    
     _controller.forward();
     _particleController.forward();
+    
+    // Start text animation after a delay
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        _textController.forward();
+      }
+    });
     
     _checkSession();
   }
@@ -180,6 +226,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   void dispose() {
     _controller.dispose();
     _particleController.dispose();
+    _waveController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -210,8 +258,19 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         ),
         child: Stack(
           children: [
+            // Animated wave background
+            AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: WavePainter(_waveAnimation.value, isDark),
+                  size: Size(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height),
+                );
+              },
+            ),
+            
             // Enhanced animated particles in background
-            ...List.generate(30, (index) {
+            ...List.generate(40, (index) {
               final random = index / 30;
               final size = 6.0 + (index % 12);
               return AnimatedBuilder(
@@ -319,57 +378,87 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           ),
                         ),
                         const SizedBox(height: 30),
-                        // Enhanced app name with gradient and animation
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: AnimatedBuilder(
-                            animation: _particleController,
-                            builder: (context, child) {
-                              return ShaderMask(
-                                shaderCallback: (bounds) {
-                                  return LinearGradient(
-                                    colors: [
-                                      _colorAnimation.value ?? const Color(0xFF03A9F4),
-                                      const Color(0xFF00BCD4),
-                                      _colorAnimation.value ?? const Color(0xFF03A9F4),
-                                    ],
-                                    stops: [
-                                      0.0,
-                                      _particleController.value,
-                                      1.0,
-                                    ],
-                                  ).createShader(bounds);
-                                },
-                                child: const Text(
-                                  'The Ictians',
-                                  style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 2.0,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0xFF03A9F4),
-                                        blurRadius: 10,
-                                        offset: Offset(0, 2),
+                        // Enhanced app name with gradient and slide animation
+                        SlideTransition(
+                          position: _textSlideAnimation,
+                          child: FadeTransition(
+                            opacity: _textFadeAnimation,
+                            child: AnimatedBuilder(
+                              animation: _particleController,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: 1.0 + 0.05 * math.sin(_particleController.value * 2 * math.pi),
+                                  child: ShaderMask(
+                                    shaderCallback: (bounds) {
+                                      return LinearGradient(
+                                        colors: [
+                                          _colorAnimation.value ?? const Color(0xFF03A9F4),
+                                          const Color(0xFF00BCD4),
+                                          const Color(0xFF4FC3F7),
+                                          _colorAnimation.value ?? const Color(0xFF03A9F4),
+                                        ],
+                                        stops: [
+                                          0.0,
+                                          _particleController.value * 0.5,
+                                          _particleController.value,
+                                          1.0,
+                                        ],
+                                      ).createShader(bounds);
+                                    },
+                                    child: const Text(
+                                      'The Ictians',
+                                      style: TextStyle(
+                                        fontSize: 38,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        letterSpacing: 2.5,
+                                        shadows: [
+                                          Shadow(
+                                            color: Color(0xFF03A9F4),
+                                            blurRadius: 15,
+                                            offset: Offset(0, 3),
+                                          ),
+                                          Shadow(
+                                            color: Color(0xFF00BCD4),
+                                            blurRadius: 25,
+                                            offset: Offset(0, 6),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // Tagline with fade animation
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Text(
-                            'Student Performance Analyzer',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isDark ? Colors.white70 : Colors.black54,
-                              letterSpacing: 1.2,
+                        // Tagline with slide and fade animation
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.5),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: _textController,
+                              curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+                            ),
+                          ),
+                          child: FadeTransition(
+                            opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
+                              CurvedAnimation(
+                                parent: _textController,
+                                curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
+                              ),
+                            ),
+                            child: Text(
+                              'Student Performance Analyzer',
+                              style: TextStyle(
+                                fontSize: 17,
+                                color: isDark ? Colors.white70 : Colors.black54,
+                                letterSpacing: 1.5,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ),
@@ -408,4 +497,59 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       ),
     );
   }
+}
+
+class WavePainter extends CustomPainter {
+  final double animationValue;
+  final bool isDark;
+
+  WavePainter(this.animationValue, this.isDark);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = (isDark ? const Color(0xFF03A9F4) : const Color(0xFF00BCD4)).withOpacity(0.1)
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final waveHeight = 30.0;
+    final waveLength = size.width / 2;
+
+    path.moveTo(0, size.height * 0.7);
+
+    for (double x = 0; x <= size.width; x += 1) {
+      final y = size.height * 0.7 + 
+          waveHeight * math.sin((x / waveLength * 2 * math.pi) + (animationValue * 2 * math.pi));
+      path.lineTo(x, y);
+    }
+
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    canvas.drawPath(path, paint);
+
+    // Second wave
+    final paint2 = Paint()
+      ..color = (isDark ? const Color(0xFF00BCD4) : const Color(0xFF03A9F4)).withOpacity(0.05)
+      ..style = PaintingStyle.fill;
+
+    final path2 = Path();
+    path2.moveTo(0, size.height * 0.8);
+
+    for (double x = 0; x <= size.width; x += 1) {
+      final y = size.height * 0.8 + 
+          waveHeight * 0.7 * math.sin((x / waveLength * 2 * math.pi) + (animationValue * 2 * math.pi) + math.pi);
+      path2.lineTo(x, y);
+    }
+
+    path2.lineTo(size.width, size.height);
+    path2.lineTo(0, size.height);
+    path2.close();
+
+    canvas.drawPath(path2, paint2);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
