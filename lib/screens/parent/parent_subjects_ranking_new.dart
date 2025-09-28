@@ -1,8 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import '../../models/subject.dart';
+import '../../widgets/glass_card.dart';
 import '../../models/student_component_data.dart';
 import '../../models/student_performance_model.dart';
 import '../../services/student_service.dart';
@@ -20,7 +20,7 @@ class SubjectsScreen extends StatefulWidget {
   State<SubjectsScreen> createState() => _SubjectsScreenState();
 }
 
-class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProviderStateMixin {
+class _SubjectsScreenState extends State<SubjectsScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   int _selectedSemester = 1;
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
@@ -30,10 +30,15 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   final StudentService _studentService = StudentService();
   final StudentAnalysisService _analysisService = StudentAnalysisService();
   StudentComponentData? _studentData;
-  StudentPerformanceModel? _performanceData;
+  // All semesters performance data, keyed by semester number
+  final Map<int, StudentPerformanceModel> _allSemesterData = {};
   bool _isLoading = true;
   bool _useNewApi = true; // Flag to switch between old and new API
   String? _error;
+
+  // Paging and scrolling for semesters
+  final PageController _pageController = PageController();
+  final ScrollController _semesterScrollController = ScrollController();
 
   // Pull-to-refresh handler
   Future<void> _onRefresh() async {
@@ -170,7 +175,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     },
   ];
 
-  // Method to fetch student data using new performance API
+  // Method to fetch student data using new performance API for all semesters
   Future<void> _fetchStudentDataNew() async {
     try {
       setState(() {
@@ -188,16 +193,26 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
       
       print('Attempting to fetch performance data for enrollment: ${user.enrollmentNumber}');
       
-      // Fetch performance data for current semester
-      final result = await _analysisService.getSubjectWisePerformance(
-        user.enrollmentNumber, 
-        _selectedSemester
-      );
+      // First fetch basic data to know available semesters
+      await _fetchStudentDataOld();
       
-      print('Performance API response received: ${result.toString()}');
+      if (_studentData != null && _studentData!.semesters.isNotEmpty) {
+        _allSemesterData.clear();
+        for (final semesterData in _studentData!.semesters) {
+          try {
+            final result = await _analysisService.getSubjectWisePerformance(
+              user.enrollmentNumber, 
+              semesterData.semesterNumber,
+            );
+            _allSemesterData[semesterData.semesterNumber] = StudentPerformanceModel.fromJson(result);
+            print('Fetched data for semester ${semesterData.semesterNumber}');
+          } catch (e) {
+            print('Error fetching semester ${semesterData.semesterNumber}: $e');
+          }
+        }
+      }
       
       setState(() {
-        _performanceData = StudentPerformanceModel.fromJson(result);
         _isLoading = false;
       });
     } catch (e) {
@@ -234,9 +249,9 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
         _studentData = StudentComponentData.fromJson(result);
         _isLoading = false;
         
-        // Set the selected semester to 1 if there are semesters available
+        // Set the selected semester to first available
         if (_studentData != null && _studentData!.semesters.isNotEmpty) {
-          _selectedSemester = 1;
+          _selectedSemester = _studentData!.semesters.first.semesterNumber;
         }
       });
     } catch (e) {
@@ -279,11 +294,17 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
   @override
   void dispose() {
     _controller.dispose();
+    _pageController.dispose();
+    _semesterScrollController.dispose();
     super.dispose();
   }
 
   @override
+  bool get wantKeepAlive => true; // persist state when navigating
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // keep-alive
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -338,36 +359,18 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                             SlideTransition(
                               position: _slideAnimation,
                               child: SizedBox(
-                                height: 36, // Reduced height for the semester pills
-                                child: SingleChildScrollView(
+                                height: 52,
+                                child: ListView.builder(
+                                  controller: _semesterScrollController,
                                   scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: _isLoading || _studentData == null || _performanceData == null
-                                    ? List.generate(1, (index) {
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          child: _buildSemesterChip(1),
-                                        );
-                                      })
-                                    : _performanceData != null
-                                    ? List.generate(_performanceData!.student.currentSemester, (index) {
-                                        final semester = index + 1;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          child: _buildSemesterChip(semester),
-                                        );
-                                      })
-                                    : _studentData != null
-                                    ? List.generate(_studentData!.semesters.length, (index) {
-                                        final semester = _studentData!.semesters[index].semesterNumber;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          child: _buildSemesterChip(semester),
-                                        );
-                                      })
-                                    : [],
-                                  ),
+                                  itemCount: _studentData?.semesters.length ?? 0,
+                                  itemBuilder: (context, index) {
+                                    final semester = _studentData!.semesters[index].semesterNumber;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: _buildSemesterChip(semester),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
@@ -386,7 +389,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                     position: _slideAnimation,
                     child: FadeTransition(
                       opacity: _fadeAnimation,
-                      child: _isLoading 
+                      child: _isLoading
                           ? ListView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               children: [
@@ -400,27 +403,27 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                                     _buildErrorMessage(),
                                   ],
                                 )
-                              : _performanceData != null
-                                  ? _buildPerformanceSubjectsList()
-                                  : (_studentData == null || _studentData!.semesters.isEmpty)
-                                      ? ListView(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          children: [
-                                            _buildNoDataMessage(),
-                                          ],
-                                        )
-                                      : ListView.builder(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          padding: const EdgeInsets.all(16),
-                                          itemCount: _selectedSemester <= _studentData!.semesters.length
-                                              ? _getSubjectsForSelectedSemester().length
-                                              : 0,
-                                          itemBuilder: (context, index) {
-                                            if (_selectedSemester > _studentData!.semesters.length) return const SizedBox();
-                                            final subject = _getSubjectsForSelectedSemester()[index];
-                                            return _buildSubjectCardFromApiData(subject, context);
-                                          },
-                                        ),
+                              : (_studentData == null || _studentData!.semesters.isEmpty)
+                                  ? ListView(
+                                      physics: const AlwaysScrollableScrollPhysics(),
+                                      children: [
+                                        _buildNoDataMessage(),
+                                      ],
+                                    )
+                                  : PageView.builder(
+                                      controller: _pageController,
+                                      onPageChanged: (index) {
+                                        setState(() {
+                                          _selectedSemester = _studentData!.semesters[index].semesterNumber;
+                                        });
+                                      },
+                                      itemCount: _studentData!.semesters.length,
+                                      itemBuilder: (context, index) {
+                                        final semesterData = _studentData!.semesters[index];
+                                        final performanceData = _allSemesterData[semesterData.semesterNumber];
+                                        return _buildSemesterSubjects(semesterData, performanceData);
+                                      },
+                                    ),
                     ),
                   ),
                 ),
@@ -438,59 +441,86 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedSemester = semester;
-        });
-        // Refetch data for the new semester if using new API
-        if (_useNewApi) {
-          _fetchStudentDataNew();
-        }
+        _changeSemester(semester);
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? (isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected 
-                ? (isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5))
-                : (isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2)),
-            width: 1,
-          ),
-        ),
-        child: Text(
-          'Sem $semester',
-          style: TextStyle(
-            color: isSelected 
-                ? (isDark ? Colors.white : Colors.black)
-                : (isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7)),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      child: GlassCard(
+        borderRadius: 20,
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            'Sem $semester',
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.95),
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              fontSize: 14,
+              height: 1.1,
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Helper method to get subjects for the selected semester
-  List<SubjectData> _getSubjectsForSelectedSemester() {
-    if (_studentData == null) return [];
+  // Helper removed: subject list now built per-page via _buildSemesterSubjects
+
+  // Change semester and animate page/scroll similar to student screen
+  void _changeSemester(int semester) {
+    if (_selectedSemester != semester) {
+      setState(() {
+        _selectedSemester = semester;
+      });
+      // Animate to the corresponding page
+      final pageIndex = (_studentData?.semesters.indexWhere((s) => s.semesterNumber == semester) ?? -1);
+      if (pageIndex >= 0) {
+        _pageController.animateToPage(
+          pageIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+      _scrollToSelectedSemester();
+    }
+  }
+
+  // Auto-scroll semester chips to keep selected near center
+  void _scrollToSelectedSemester() {
+    if (_studentData != null) {
+      final index = _studentData!.semesters.indexWhere((s) => s.semesterNumber == _selectedSemester);
+      if (index >= 0 && _semesterScrollController.hasClients) {
+        const itemWidth = 100.0; // approx width
+        final screenWidth = MediaQuery.of(context).size.width;
+        final scrollOffset = (index * itemWidth) - (screenWidth / 2) + (itemWidth / 2);
+        _semesterScrollController.animateTo(
+          scrollOffset.clamp(0.0, _semesterScrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+  }
+
+  // Build subjects for a semester using performance data if available, else fallback
+  Widget _buildSemesterSubjects(SemesterData semesterData, StudentPerformanceModel? performanceData) {
+    final subjectsPerf = performanceData?.subjects ?? [];
+    final fallbackSubjects = semesterData.subjects;
     
-    // Find the semester that matches the selected semester number
-    final selectedSemesterData = _studentData!.semesters.firstWhere(
-      (sem) => sem.semesterNumber == _selectedSemester,
-      orElse: () => _studentData!.semesters.isNotEmpty ? _studentData!.semesters.first : SemesterData(
-        semesterId: 0,
-        semesterNumber: 0,
-        startDate: '',
-        endDate: '',
-        subjects: [],
-      ),
+    if (subjectsPerf.isNotEmpty) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: subjectsPerf.length,
+        itemBuilder: (context, index) {
+          return _buildPerformanceSubjectCard(subjectsPerf[index], context);
+        },
+      );
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: fallbackSubjects.length,
+      itemBuilder: (context, index) {
+        return _buildSubjectCardFromApiData(fallbackSubjects[index], context);
+      },
     );
-    
-    return selectedSemesterData.subjects;
   }
 
   // Widget for loading state
@@ -617,22 +647,6 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
     );
   }
 
-  // Widget for performance subjects list (new API)
-  Widget _buildPerformanceSubjectsList() {
-    if (_performanceData == null || _performanceData!.subjects.isEmpty) {
-      return _buildNoDataMessage();
-    }
-    
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _performanceData!.subjects.length,
-      itemBuilder: (context, index) {
-        final subject = _performanceData!.subjects[index];
-        return _buildPerformanceSubjectCard(subject, context);
-      },
-    );
-  }
-  
   // Build subject card from performance API data
   Widget _buildPerformanceSubjectCard(SubjectPerformance subject, BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -681,52 +695,36 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
             ),
           );
         },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.1) 
-                    : Colors.black.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark 
-                      ? Colors.white.withOpacity(0.2) 
-                      : Colors.black.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        // Grade circle
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: gradeColor.withOpacity(0.2),
-                            border: Border.all(
-                              color: gradeColor,
-                              width: 2,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              grade,
-                              style: TextStyle(
-                                color: gradeColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
+        child: GlassCard(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  // Grade circle
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: gradeColor.withOpacity(0.2),
+                      border: Border.all(
+                        color: gradeColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        grade,
+                        style: TextStyle(
+                          color: gradeColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
+                      ),
+                    ),
+                  ),
                         const SizedBox(width: 16),
                         // Subject details
                         Expanded(
@@ -737,7 +735,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                                 subject.subject,
                                 style: TextStyle(
                                   color: isDark ? Colors.white : Colors.black,
-                                  fontSize: 18,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -786,10 +784,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> with SingleTickerProvid
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
+          );
   }
 
   // Build subject card from API data

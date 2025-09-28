@@ -536,7 +536,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           // Login Button
           Center(
             child: SizedBox(
-              width: 200, // Fixed width to center the button
+              width: 200,
               height: 55,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _performLogin,

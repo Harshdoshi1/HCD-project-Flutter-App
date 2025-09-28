@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'constants/app_theme.dart';
 import 'providers/user_provider.dart';
 import 'screens/splash_screen.dart';
+import 'screens/login_page.dart';
 import 'utils/api_config.dart';
 
 void main() async {
@@ -48,6 +49,10 @@ class _MyAppState extends State<MyApp> {
         darkTheme: AppTheme.darkTheme,
         themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
         home: SplashScreen(toggleTheme: _toggleTheme),
+        routes: {
+          '/login': (context) => LoginPage(toggleTheme: _toggleTheme),
+          '/splash': (context) => SplashScreen(toggleTheme: _toggleTheme),
+        },
       ),
     );
   }

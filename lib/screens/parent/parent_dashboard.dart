@@ -9,7 +9,6 @@ import '../../../providers/user_provider.dart';
 import '../../../services/academic_service.dart';
 import '../../utils/api_config.dart';
 import '../main_navigation.dart';
-import '../login_page.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -1047,21 +1046,10 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
 
   void _logout() async {
     try {
-      // Clear user data from provider
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       userProvider.clearUser();
       
-      // Clear SharedPreferences data
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      
-      // Navigate to login page using MaterialPageRoute
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => LoginPage(toggleTheme: widget.toggleTheme),
-        ),
-        (route) => false,
-      );
+      Navigator.of(context).pushReplacementNamed('/login');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

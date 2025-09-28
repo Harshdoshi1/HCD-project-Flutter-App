@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../../services/student_service.dart';
 import '../../models/student_ranking_model.dart';
 import 'student_detail_screen.dart';
+import '../../widgets/glass_card.dart';
 import 'student_activities_screen.dart';
 import 'student_grades_screen.dart';
 
@@ -546,7 +547,22 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     
     // Show loading indicator while data is being fetched
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF03A9F4)),
+            const SizedBox(height: 16),
+            Text(
+              'Loading students...',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
     }
     
     // Show error message if there was an error fetching data
@@ -658,53 +674,10 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    isDark 
-                        ? Colors.white.withOpacity(0.12) 
-                        : Colors.white.withOpacity(0.8),
-                    isDark 
-                        ? Colors.white.withOpacity(0.05) 
-                        : Colors.white.withOpacity(0.6),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark 
-                      ? Colors.white.withOpacity(0.2) 
-                      : const Color(0xFF03A9F4).withOpacity(0.2),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark 
-                        ? Colors.black.withOpacity(0.2)
-                        : const Color(0xFF03A9F4).withOpacity(0.08),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                    spreadRadius: 0,
-                  ),
-                  BoxShadow(
-                    color: isDark 
-                        ? Colors.white.withOpacity(0.03)
-                        : Colors.white.withOpacity(0.5),
-                    blurRadius: 4,
-                    offset: const Offset(0, -1),
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Row(
+        child: GlassCard(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(18),
+          child: Row(
                   children: [
                     // Enhanced Rank circle with gradient and glow animation for top 3
                     rank <= 3 
@@ -857,11 +830,9 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
                   ],
                 ),
               ),
-            ),
+            
           ),
-        ),
-      ),
-    );
+        );
   }
 
   Color _getRankColor(int rank) {

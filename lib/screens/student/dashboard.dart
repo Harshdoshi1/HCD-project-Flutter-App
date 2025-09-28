@@ -434,6 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final user = userProvider.user;
       
       if (user != null) {
+        if (!mounted) return;
         setState(() {
           _userName = user.name;
           _enrollmentNumber = user.enrollmentNumber;
@@ -479,6 +480,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final user = userProvider.user;
       
       if (user != null) {
+        if (!mounted) return;
         setState(() {
           _enrollmentNumber = user.enrollmentNumber;
         });
@@ -505,6 +507,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               
               print('Total activity points response: $pointsData');
               
+              if (!mounted) return;
               setState(() {
                 _cocurricularPoints = pointsData['totalCocurricular'] != null ? 
                     int.parse(pointsData['totalCocurricular'].toString()) : 0;
@@ -518,6 +521,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             final userData = prefs.getString('userData');
             if (userData != null) {
               final userMap = json.decode(userData);
+              if (!mounted) return;
               setState(() {
                 _cocurricularPoints = userMap['totalCocurricular'] ?? userMap['cocurricularPoints'] ?? 0;
                 _extracurricularPoints = userMap['totalExtracurricular'] ?? userMap['extracurricularPoints'] ?? 0;
@@ -578,6 +582,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 }
               }
               
+              if (!mounted) return;
               setState(() {
                 _activities = enrichedActivities;
                 _isLoadingActivityPoints = false;
@@ -594,11 +599,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             await _loadActivityPointsFallback(token);
           }
         } else {
+          if (!mounted) return;
           setState(() {
             _isLoadingActivityPoints = false;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _cocurricularPoints = 0;
           _extracurricularPoints = 0;
@@ -607,6 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     } catch (e) {
       debugPrint('Error loading activity points: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingActivityPoints = false;
       });
@@ -632,22 +640,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final data = json.decode(response.body);
         
         if (data is List && data.isNotEmpty) {
+          if (!mounted) return;
           setState(() {
             _activities = data;
             _isLoadingActivityPoints = false;
           });
         } else {
+          if (!mounted) return;
           setState(() {
             _isLoadingActivityPoints = false;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingActivityPoints = false;
         });
       }
     } catch (e) {
       print('Error in fallback method: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingActivityPoints = false;
       });
@@ -1423,9 +1435,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   horizontalInterval: 20,
                   getDrawingHorizontalLine: (value) {
                     return FlLine(
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white.withOpacity(0.1) 
-                          : Colors.black.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.1),
                       strokeWidth: 1,
                     );
                   },
@@ -1442,9 +1452,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         backDrawRodData: BackgroundBarChartRodData(
                           show: true,
                           toY: 100,
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.white.withOpacity(0.1) 
-                              : Colors.black.withOpacity(0.1),
+                          color: Colors.white.withOpacity(0.1),
             ),
           ),
         ],
@@ -2483,7 +2491,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
-              tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
+              tooltipBgColor: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
               tooltipPadding: const EdgeInsets.all(8),
               tooltipMargin: 8,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -2552,9 +2560,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             show: true,
             horizontalInterval: 1,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.white.withOpacity(0.1) 
-                  : Colors.black.withOpacity(0.1),
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
               strokeWidth: 1,
             ),
             drawVerticalLine: false,
@@ -2576,9 +2582,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
                     toY: 10,
-                    color: Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.white.withOpacity(0.1) 
-                        : Colors.black.withOpacity(0.1),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                   ),
                 ),
               ],
@@ -3050,7 +3054,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             barTouchData: BarTouchData(
               enabled: true,
               touchTooltipData: BarTouchTooltipData(
-                tooltipBgColor: Colors.black.withOpacity(0.8),
+                tooltipBgColor: Theme.of(context).brightness == Brightness.dark ? Colors.black.withOpacity(0.8) : Colors.white.withOpacity(0.8),
                 tooltipPadding: const EdgeInsets.all(8),
                 tooltipMargin: 8,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -3059,8 +3063,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final score = bloomLevel.score ?? 0;
                   return BarTooltipItem(
                     '${bloomLevel.level}\n${marks.toStringAsFixed(1)} marks\n($score%)',
-                    const TextStyle(
-                      color: Colors.white,
+                    TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                       fontWeight: FontWeight.bold,
                       fontSize: 11,
                     ),
@@ -3152,9 +3156,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               horizontalInterval: _calculateGridInterval(maxMarks),
               getDrawingHorizontalLine: (value) {
                 return FlLine(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white.withOpacity(0.1) 
-                      : Colors.black.withOpacity(0.1),
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
                   strokeWidth: 1,
                 );
               },
@@ -3181,9 +3183,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     backDrawRodData: BackgroundBarChartRodData(
                       show: true,
                       toY: maxMarks,
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white.withOpacity(0.1) 
-                          : Colors.black.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.1),
                     ),
                   ),
                 ],
