@@ -10,17 +10,22 @@ import '../../services/student_analysis_service.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../student/subject_detail_screen.dart';
+// Export the student SubjectsScreen so imports of this parent file get the student UI
+export '../student/subjects_screen.dart' show SubjectsScreen;
+// The student SubjectsScreen is re-exported above; no extra import needed.
 
-class SubjectsScreen extends StatefulWidget {
+// Legacy implementation kept but renamed to avoid symbol conflicts.
+// External code importing this file should use the exported student SubjectsScreen.
+class ParentSubjectsLegacyScreen extends StatefulWidget {
   final VoidCallback toggleTheme;
   
-  const SubjectsScreen({super.key, required this.toggleTheme});
+  const ParentSubjectsLegacyScreen({super.key, required this.toggleTheme});
 
   @override
-  State<SubjectsScreen> createState() => _SubjectsScreenState();
+  State<ParentSubjectsLegacyScreen> createState() => _ParentSubjectsLegacyScreenState();
 }
 
-class _SubjectsScreenState extends State<SubjectsScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+class _ParentSubjectsLegacyScreenState extends State<ParentSubjectsLegacyScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   int _selectedSemester = 1;
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
