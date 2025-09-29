@@ -97,7 +97,7 @@ class SubjectPerformance {
       if (json['ese'] != null) {
         componentMap['ESE'] = ComponentPerformance(
           marksObtained: (json['ese'] ?? 0).toDouble(),
-          totalMarks: 100.0, // Default max marks for ESE
+          totalMarks: 50.0, // Default max marks for ESE
           percentage: 0.0,
           subComponents: [],
         );
@@ -121,7 +121,7 @@ class SubjectPerformance {
       if (json['viva'] != null) {
         componentMap['VIVA'] = ComponentPerformance(
           marksObtained: (json['viva'] ?? 0).toDouble(),
-          totalMarks: 15.0, // Default max marks for VIVA
+          totalMarks: 25.0, // Default max marks for VIVA (updated from 15)
           percentage: 0.0,
           subComponents: [],
         );
@@ -129,9 +129,34 @@ class SubjectPerformance {
       if (json['cse'] != null) {
         componentMap['CSE'] = ComponentPerformance(
           marksObtained: (json['cse'] ?? 0).toDouble(),
-          totalMarks: 15.0, // Default max marks for CSE
+          totalMarks: 20.0, // Default max marks for CSE (updated from 15)
           percentage: 0.0,
           subComponents: [],
+        );
+      }
+    }
+
+    // Client-side correction: if backend still sends VIVA out of 15, display as 25
+    if (componentMap.containsKey('VIVA')) {
+      final vivaComp = componentMap['VIVA']!;
+      if (vivaComp.totalMarks == 15.0) {
+        componentMap['VIVA'] = ComponentPerformance(
+          marksObtained: vivaComp.marksObtained,
+          totalMarks: 25.0,
+          percentage: vivaComp.percentage,
+          subComponents: vivaComp.subComponents,
+        );
+      }
+    }
+    // Client-side correction: if backend still sends CSE out of 15, display as 20
+    if (componentMap.containsKey('CSE')) {
+      final cseComp = componentMap['CSE']!;
+      if (cseComp.totalMarks == 15.0) {
+        componentMap['CSE'] = ComponentPerformance(
+          marksObtained: cseComp.marksObtained,
+          totalMarks: 20.0,
+          percentage: cseComp.percentage,
+          subComponents: cseComp.subComponents,
         );
       }
     }

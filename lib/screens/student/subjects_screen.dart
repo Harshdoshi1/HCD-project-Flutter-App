@@ -879,8 +879,8 @@ class _SubjectsScreenState extends State<SubjectsScreen> with TickerProviderStat
       if (marks.ese != null) components['ESE'] = {'marks': marks.ese!, 'outOf': 50.0};
       if (marks.ia != null) components['IA'] = {'marks': marks.ia!, 'outOf': 25.0};
       if (marks.tw != null) components['TW'] = {'marks': marks.tw!, 'outOf': 25.0};
-      if (marks.viva != null) components['VIVA'] = {'marks': marks.viva!, 'outOf': 15.0};
-      if (marks.cse != null) components['CSE'] = {'marks': marks.cse!, 'outOf': 15.0};
+      if (marks.viva != null) components['VIVA'] = {'marks': marks.viva!, 'outOf': 25.0};
+      if (marks.cse != null) components['CSE'] = {'marks': marks.cse!, 'outOf': 20.0};
     }
 
     Navigator.push(

@@ -387,6 +387,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                     SizedBox(height: 16),
                     _buildRecentActivities(),
                     SizedBox(height: 16),
+                    _buildDepartmentGoalsCard(),
+                    SizedBox(height: 16),
                     _buildQuickActions(),
                   ],
                 ],
@@ -714,6 +716,174 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                   },
                 ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDepartmentGoalsCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final goals = [
+      {
+        'title': 'Project Based Learning',
+        'icon': Icons.engineering,
+        'color': const Color(0xFF42A5F5),
+      },
+      {
+        'title': 'Long Hour Coding',
+        'icon': Icons.code,
+        'color': const Color(0xFF66BB6A),
+      },
+      {
+        'title': 'Seminars',
+        'icon': Icons.mic,
+        'color': const Color(0xFFFFB74D),
+      },
+      {
+        'title': 'Industry Visits',
+        'icon': Icons.apartment,
+        'color': const Color(0xFFAB47BC),
+      },
+      {
+        'title': 'Placements',
+        'icon': Icons.work,
+        'color': const Color(0xFFEF5350),
+      },
+      {
+        'title': 'Patents',
+        'icon': Icons.emoji_objects_outlined,
+        'color': const Color(0xFF26C6DA),
+      },
+    ];
+
+    return _buildGlassmorphicCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF00BCD4).withOpacity(0.9),
+                      const Color(0xFF3F51B5).withOpacity(0.9),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isDark ? Colors.white : Colors.black).withOpacity(0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.flag, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Department Goals',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Key focus areas driving student success',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 360;
+              final crossAxisCount = isWide ? 3 : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: isWide ? 2.6 : 2.4,
+                ),
+                itemCount: goals.length,
+                itemBuilder: (context, index) {
+                  final goal = goals[index];
+                  return _buildGoalTile(
+                    goal['title'] as String,
+                    goal['icon'] as IconData,
+                    goal['color'] as Color,
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalTile(String title, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withOpacity(0.14),
+            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.35), width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withOpacity(0.4), width: 1),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
