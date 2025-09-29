@@ -827,10 +827,17 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
                 itemCount: goals.length,
                 itemBuilder: (context, index) {
                   final goal = goals[index];
-                  return _buildGoalTile(
-                    goal['title'] as String,
-                    goal['icon'] as IconData,
-                    goal['color'] as Color,
+                  return GestureDetector(
+                    onTap: () => _showDepartmentGoalDetails(
+                      goal['title'] as String,
+                      goal['icon'] as IconData,
+                      goal['color'] as Color,
+                    ),
+                    child: _buildGoalTile(
+                      goal['title'] as String,
+                      goal['icon'] as IconData,
+                      goal['color'] as Color,
+                    ),
                   );
                 },
               );
@@ -886,6 +893,260 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen>
         ),
       ),
     );
+  }
+
+  void _showDepartmentGoalDetails(String title, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    List<String> benefits;
+    switch (title) {
+      case 'Project Based Learning':
+        benefits = [
+          'Hands-on, experiential learning',
+          'Team collaboration and leadership',
+          'Portfolio-ready outcomes',
+          'Bridges theory with real-world practice',
+        ];
+        break;
+      case 'Long Hour Coding':
+        benefits = [
+          'Deep work and problem-solving stamina',
+          'Improved debugging and code quality',
+          'Mastery of data structures & algorithms',
+          'Industry-like coding culture',
+        ];
+        break;
+      case 'Seminars':
+        benefits = [
+          'Exposure to latest trends and tech',
+          'Improved presentation skills',
+          'Networking with experts',
+          'Confidence in public speaking',
+        ];
+        break;
+      case 'Industry Visits':
+        benefits = [
+          'Real-time insight into workflows',
+          'Understanding of tools and processes',
+          'Career orientation and awareness',
+          'Inspiration for projects and internships',
+        ];
+        break;
+      case 'Placements':
+        benefits = [
+          'Career readiness and interview prep',
+          'Soft skills, resume and aptitude build',
+          'DSA Coding preparation',
+        ];
+        break;
+      case 'Patents':
+        benefits = [
+          'Recognition of innovation',
+          'Strong research and IP culture',
+          'Opportunities for commercialization',
+          '100+ patent publications by deparment every year',
+        ];
+        break;
+      default:
+        benefits = [
+          'Enhances student development',
+          'Builds industry readiness',
+          'Improves academic excellence',
+        ];
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.45,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Grab handle
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [color.withOpacity(0.95), color.withOpacity(0.7)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Icon(icon, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Benefits for students',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Benefits chips/cards
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: benefits.map((b) => _buildBenefitChip(b, color, isDark)).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                          // Info card
+                          _buildInfoCard(title, color, isDark),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBenefitChip(String text, Color color, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, color: color, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String title, Color color, bool isDark) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.15), color.withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How this helps',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _goalDescription(title),
+              style: TextStyle(
+                color: Colors.grey[600],
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _goalDescription(String title) {
+    switch (title) {
+      case 'Project Based Learning':
+        return 'Students build end-to-end solutions that mirror real projects, improving ownership, collaboration and employability.';
+      case 'Long Hour Coding':
+        return 'Focused coding sessions that strengthen logic, build resilience and simulate real engineering environments.';
+      case 'Seminars':
+        return 'Expert-led sessions to keep students updated with technology trends and sharpen communication skills.';
+      case 'Industry Visits':
+        return 'First-hand exposure to professional setups, helping students align academic goals with industry expectations.';
+      case 'Placements':
+        return 'A structured journey of aptitude, soft skills and interview preparation to maximize job outcomes.';
+      case 'Patents':
+        return 'Encourages research mindset, protects intellectual property and opens doors to innovation-driven careers.';
+      default:
+        return 'A key initiative to enhance holistic development and prepare students for real-world success.';
+    }
   }
 
   String _formatDate(String dateString) {
