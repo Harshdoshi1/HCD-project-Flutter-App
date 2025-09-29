@@ -231,15 +231,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           _isLoading = false;
         });
 
-        // Show error dialog with custom message for timeout
+        // Show error dialog with generic message; do not expose raw exceptions or URLs
         if (!mounted) return;
-        String errorMessage = e.toString().replaceAll('Exception: ', '');
-        
-        // Check if it's a timeout error
-        if (errorMessage.contains('TimeoutException') || errorMessage.contains('timeout')) {
-          errorMessage = 'Please check your internet connection and try again.';
+        // Log detailed error for developers only
+        // ignore: avoid_print
+        print('Login failed (internal details): $e');
+
+        String errorMessage = 'Unable to log in right now. Please check your credentials or try again later.';
+        final err = e.toString().toLowerCase();
+        if (err.contains('timed out') || err.contains('timeout')) {
+          errorMessage = 'Request timed out. Please check your internet connection and try again.';
+        } else if (err.contains('network') || err.contains('socket') || err.contains('failed host lookup') || err.contains('clientexception')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (err.contains('unauthorized') || err.contains('invalid credentials')) {
+          errorMessage = 'Invalid email or enrollment number.';
         }
-        
+
         showDialog(
           context: context,
           builder: (context) => AlertDialog(

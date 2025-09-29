@@ -260,6 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   
   late String _dailyQuote;
   String _userName = 'User';
+  int _currentSemesterDisplay = 0;
 
   Future<void> _loadSPIData() async {
     try {
@@ -355,22 +356,46 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         if (semesters.isNotEmpty) {
           print('API returned ${semesters.length} semesters');
           
-          // Find current semester (highest semester number)
-          int highestSemester = 0;
-          Map<String, dynamic>? currentSemesterData;
+          // Determine current semester from provider first, fallback to highest
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          final user = userProvider.user;
+          int targetSemester = user?.currentSemester ?? 0;
           
+          // Fallback to SharedPreferences if provider missing
+          if (targetSemester == 0) {
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              final userData = prefs.getString('userData');
+              if (userData != null) {
+                final decoded = json.decode(userData);
+                targetSemester = decoded['currentSemester'] ?? decoded['semester'] ?? 0;
+              }
+            } catch (_) {}
+          }
+          
+          // If still not found, fallback to highest semester number
+          int highestSemester = 0;
           for (var semesterData in semesters) {
             if (semesterData.containsKey('semesterNumber')) {
               final int semesterNumber = int.tryParse(semesterData['semesterNumber'].toString()) ?? 0;
               if (semesterNumber > highestSemester) {
                 highestSemester = semesterNumber;
-                currentSemesterData = semesterData;
               }
             }
           }
+          if (targetSemester == 0) targetSemester = highestSemester;
           
-          // Set current semester number
-          _currentSemesterNumber = highestSemester;
+          // Pick the matching semester data if available, else fallback to highest
+          Map<String, dynamic>? currentSemesterData = semesters.firstWhere(
+            (s) => (int.tryParse((s['semesterNumber'] ?? '0').toString()) ?? 0) == targetSemester,
+            orElse: () => (semesters.firstWhere(
+              (s) => (int.tryParse((s['semesterNumber'] ?? '0').toString()) ?? 0) == highestSemester,
+              orElse: () => semesters.first,
+            )),
+          );
+          
+          // Set current semester number used in UI
+          _currentSemesterNumber = targetSemester;
           
           // Process subject data for the current semester
           if (currentSemesterData != null && 
@@ -438,6 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         setState(() {
           _userName = user.name;
           _enrollmentNumber = user.enrollmentNumber;
+          _currentSemesterDisplay = user.currentSemester;
         });
         
         // Now that we have the enrollment number, fetch additional data
@@ -696,10 +722,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _isLoadingBlooms = true;
       });
       
-      // Use current semester (default to 1)
+      // Use user's real current semester when available
       int currentSemester = 1;
-      if (_semesterSPIData.isNotEmpty) {
+      if (user.currentSemester > 0) {
+        currentSemester = user.currentSemester;
+      } else if (_semesterSPIData.isNotEmpty) {
         currentSemester = _semesterSPIData.last['semester'] ?? 1;
+      } else {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final userData = prefs.getString('userData');
+          if (userData != null) {
+            final decoded = json.decode(userData);
+            currentSemester = decoded['currentSemester'] ?? decoded['semester'] ?? 1;
+          }
+        } catch (_) {}
       }
       
       print('Loading Bloom\'s data for enrollment: ${user.enrollmentNumber}, semester: $currentSemester');
@@ -2010,7 +2047,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   _buildInfoRow(
                     'Current Semester', 
                     _semesterSPIData.isNotEmpty 
-                      ? '${_semesterSPIData.last['semester']}th'
+                      ? '$_currentSemesterDisplay'
                       : 'N/A'
                   ),
                   _buildInfoRow(

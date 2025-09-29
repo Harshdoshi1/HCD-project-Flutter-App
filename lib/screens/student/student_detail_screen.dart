@@ -10,6 +10,7 @@ class StudentDetailScreen extends StatefulWidget {
   final String studentEnrollment;
   final String studentDetails;
   final VoidCallback toggleTheme;
+  final bool showAcademicSections;
 
   const StudentDetailScreen({
     super.key,
@@ -18,6 +19,7 @@ class StudentDetailScreen extends StatefulWidget {
     required this.studentEnrollment,
     required this.studentDetails,
     required this.toggleTheme,
+    this.showAcademicSections = true,
   });
 
   @override
@@ -33,6 +35,80 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   void initState() {
     super.initState();
     _fetchStudentComponentData();
+  }
+
+  // Summary-only view: show SPI, CPI, Rank per semester (no subject breakdown)
+  List<Widget> _buildSemesterSummarySections(BuildContext context) {
+    if (componentData == null || componentData!.semesters.isEmpty) {
+      return [const Text('No semester data available')];
+    }
+
+    final widgets = <Widget>[];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    for (final semester in componentData!.semesters) {
+      widgets.add(const SizedBox(height: 16));
+      widgets.add(_buildGlassCard(
+        context,
+        title: 'Semester ${semester.semesterNumber}',
+        icon: Icons.bar_chart,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _metricTile('SPI', semester.spi?.toStringAsFixed(2) ?? 'N/A', Colors.blue, isDark),
+                _metricTile('CPI', semester.cpi?.toStringAsFixed(2) ?? 'N/A', Colors.teal, isDark),
+                _metricTile('Rank', semester.rank?.toString() ?? 'N/A', Colors.purple, isDark),
+              ],
+            ),
+          ),
+          Text(
+            'Duration: ${_formatDate(semester.startDate)} - ${_formatDate(semester.endDate)}',
+            style: TextStyle(
+              color: isDark ? Colors.white.withOpacity(0.7) : Colors.black.withOpacity(0.7),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ));
+    }
+
+    return widgets;
+  }
+
+  Widget _metricTile(String label, String value, Color color, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _fetchStudentComponentData() async {
@@ -176,8 +252,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         ],
                       ),
                     )
-                  else if (componentData != null)
-                    ..._buildSemesterSections(context),
+                  else if (componentData != null && widget.showAcademicSections)
+                    ..._buildSemesterSections(context)
+                  else if (componentData != null && !widget.showAcademicSections)
+                    ..._buildSemesterSummarySections(context),
                   
                   const SizedBox(height: 16),
                   

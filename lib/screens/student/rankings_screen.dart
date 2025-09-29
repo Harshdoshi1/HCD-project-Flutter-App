@@ -6,8 +6,7 @@ import '../../services/student_service.dart';
 import '../../models/student_ranking_model.dart';
 import 'student_detail_screen.dart';
 import '../../widgets/glass_card.dart';
-import 'student_activities_screen.dart';
-import 'student_grades_screen.dart';
+// Removed: student_activities_screen.dart and student_grades_screen.dart since we now open profile directly
 
 class RankingsScreen extends StatefulWidget {
   const RankingsScreen({super.key, required this.toggleTheme});
@@ -240,11 +239,12 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Rankings',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
           ),
         ),
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
@@ -654,23 +654,22 @@ class _RankingsScreenState extends State<RankingsScreen> with TickerProviderStat
     
     return GestureDetector(
       onTap: () {
-        if (isAcademic) {
-          // Academic section: navigate to student grades screen
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => StudentGradesScreen(student: student),
+        // Open profile page for both tabs
+        final details = isAcademic
+            ? 'CPI: ${student.cpi?.toStringAsFixed(2) ?? 'N/A'} | SPI: ${student.spi?.toStringAsFixed(2) ?? 'N/A'} | Sem: ${student.currentSemester > 0 ? student.currentSemester : 'N/A'}'
+            : 'CC: ${student.cocurricularPoints} | EC: ${student.extracurricularPoints} | HW: ${student.hardwarePoints} | SW: ${student.softwarePoints} | Total: ${student.totalPoints + student.totalActivityPoints}';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StudentDetailScreen(
+              studentName: student.name,
+              studentEmail: student.email,
+              studentEnrollment: student.enrollmentNumber,
+              studentDetails: details,
+              toggleTheme: widget.toggleTheme,
             ),
-          );
-        } else {
-          // Non-academic section: navigate to student activities
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => StudentActivitiesScreen(student: student),
-            ),
-          );
-        }
+          ),
+        );
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
